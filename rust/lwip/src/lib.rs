@@ -8,6 +8,19 @@
 //! is on; the shared struct mirrors in [`types`] always are.
 
 #![no_std]
+// A firmware that ports only some modules builds only some of them, and the shared
+// helpers (C strings, assertions, calls between modules) serve modules that may be off.
+#![cfg_attr(
+    not(all(
+        feature = "def",
+        feature = "inet_chksum",
+        feature = "ip4_addr",
+        feature = "mem",
+        feature = "memp",
+        feature = "pbuf"
+    )),
+    allow(dead_code, unused_imports, unused_macros)
+)]
 
 pub mod config {
     //! The lwIP options the crate is built for; see `build.rs`.
@@ -20,9 +33,18 @@ pub mod types;
 #[macro_use]
 mod platform;
 
+mod links;
+pub mod mem;
+pub mod memp;
+mod sys;
+#[cfg(test)]
+mod test_support;
+
 #[cfg(feature = "def")]
 pub mod def;
 #[cfg(feature = "inet_chksum")]
 pub mod inet_chksum;
 #[cfg(all(feature = "ip4_addr", lwip_ipv4))]
 pub mod ip4_addr;
+#[cfg(feature = "pbuf")]
+pub mod pbuf;

@@ -28,7 +28,10 @@ set(LWIP_RUST_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE INTERNAL "")
 set(LWIP_RUST_FILES
     "def=core/def.c"
     "inet_chksum=core/inet_chksum.c"
-    "ip4_addr=core/ipv4/ip4_addr.c")
+    "ip4_addr=core/ipv4/ip4_addr.c"
+    "mem=core/mem.c"
+    "memp=core/memp.c"
+    "pbuf=core/pbuf.c")
 
 function(lwip_rust_apply target)
     set(modules ${ARGN})
