@@ -78,13 +78,13 @@ pub fn standard_chksum(data: &[u8]) -> u16 {
     }
 
     // Add the bulk of the data.
-    let mut words = rest.chunks_exact(2);
-    for word in &mut words {
-        sum = sum.wrapping_add(u32::from(u16::from_ne_bytes([word[0], word[1]])));
+    let (words, left_over) = rest.as_chunks::<2>();
+    for &word in words {
+        sum = sum.wrapping_add(u32::from(u16::from_ne_bytes(word)));
     }
 
     // Consume left-over byte, if any.
-    if let [last] = words.remainder() {
+    if let [last] = left_over {
         t[0] = *last;
     }
 
