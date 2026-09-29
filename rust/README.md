@@ -25,6 +25,16 @@ count per module.
 | `def` | `src/core/def.c` | `def` |
 | `inet_chksum` | `src/core/inet_chksum.c` | `inet_chksum` |
 | `ip4_addr` | `src/core/ipv4/ip4_addr.c` | `ip4_addr` |
+| `mem` | `src/core/mem.c` (`MEM_LIBC_MALLOC`) | `mem` |
+| `memp` | `src/core/memp.c` (`MEMP_MEM_MALLOC`) | `memp` |
+| `pbuf` | `src/core/pbuf.c` | `pbuf` |
+
+`mem` and `memp` are ported for the configuration ESP-IDF uses, where lwIP's heap
+is the C library's allocator and each pool allocates from it; `build.rs`
+refuses lwIP's own heap and static pools. `memp.rs`'s pool descriptors are
+generated from the configuration's `memp_std.h`, as `memp.c` declares them.
+A module calls a neighbor that is still C through the C symbol
+(`lwip/src/links.rs`), so any subset can be built.
 
 ## Configuration
 
@@ -46,7 +56,8 @@ Make a component directory named `lwip` that overrides ESP-IDF's (through
 - `apps`, `include`, `port`, `Kconfig`, `linker.lf`, and `sdkconfig.rename`,
   links to ESP-IDF's `components/lwip` entries.
 
-Then configure the project with `-DLWIP_RUST_MODULES="def;inet_chksum;ip4_addr"`
+Then configure the project with
+`-DLWIP_RUST_MODULES="def;inet_chksum;ip4_addr;mem;memp;pbuf"`
 and, if cargo is not on `PATH`, `-DLWIP_RUST_CARGO=<cargo>`. The Rust target is
 `riscv32imafc-unknown-none-elf` (`rv32imafc`, `ilp32f`); set `LWIP_RUST_TARGET`
 for another.

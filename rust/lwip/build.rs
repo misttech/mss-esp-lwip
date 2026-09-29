@@ -8,6 +8,9 @@
 //! `NAME` is a feature switch and its value is not 0, and, for the layout entries, a
 //! compile-time check of the matching `#[repr(C)]` mirror (the `lwip_layout` cfg).
 //!
+//! The memory pools lwIP declares in `memp_std.h` (the `MEMP_POOL_<name>` and
+//! `MEMP_SIZE_<name>` entries) also become `memp_pools.rs`: `memp.c`'s pool descriptors.
+//!
 //! Without `LWIP_RUST_CONFIG`, as in host tests, the options are ESP-IDF v6.1's defaults
 //! below, and no layout is checked: host pointers are wider than the target's.
 
@@ -40,6 +43,13 @@ const SWITCHES: &[(&str, u64)] = &[
     ("LWIP_ITOA_FN", 1),
     ("LWIP_NO_CTYPE_H", 0),
     ("LWIP_STANDARD_CHKSUM", 1),
+    ("MEM_LIBC_MALLOC", 1),
+    ("MEMP_MEM_MALLOC", 1),
+    ("ESP_LWIP", 1),
+    ("LWIP_TCP", 1),
+    ("LWIP_SUPPORT_CUSTOM_PBUF", 1),
+    ("PBUF_POOL_FREE_OOSEQ", 1),
+    ("PBUF_SPLIT_64K", 0),
 ];
 
 /// Values. ESP-IDF v6.1 defaults.
@@ -50,6 +60,46 @@ const VALUES: &[(&str, u64)] = &[
     ("IP4ADDR_STRLEN_MAX", 16),
     ("LWIP_CHKSUM_ALGORITHM", 2),
     ("LWIP_CHKSUM_COPY_ALGORITHM", 0),
+    ("MEM_USE_POOLS", 0),
+    ("MEM_ALIGNMENT", 4),
+    ("MEM_OVERFLOW_CHECK", 0),
+    ("MEM_SANITY_CHECK", 0),
+    ("MEMP_OVERFLOW_CHECK", 0),
+    ("MEM_STATS", 0),
+    ("MEMP_STATS", 0),
+    ("PBUF_STATS", 0),
+    ("LWIP_MEM_CLIB_HEAP_CAPS", 0),
+    ("NO_SYS", 0),
+    ("LWIP_DEBUG", 0),
+    ("LWIP_CHECKSUM_ON_COPY", 0),
+    ("MEMP_NUM_TCP_PCB", 16),
+    ("PBUF_POOL_BUFSIZE", 1516),
+    // Read only when a tcp_pcb exists; host tests have none.
+    ("TCP_PCB_NEXT", 0),
+    ("TCP_PCB_OOSEQ", 0),
+];
+
+/// The memory pools, as `memp_std.h` declares them: name and descriptor size, in memp_t
+/// order. ESP-IDF v6.1 defaults.
+const POOLS: &[(&str, u64)] = &[
+    ("RAW_PCB", 72),
+    ("UDP_PCB", 80),
+    ("TCP_PCB", 208),
+    ("TCP_PCB_LISTEN", 76),
+    ("TCP_SEG", 16),
+    ("FRAG_PBUF", 24),
+    ("NETBUF", 36),
+    ("NETCONN", 52),
+    ("TCPIP_MSG_API", 16),
+    ("TCPIP_MSG_INPKT", 16),
+    ("ARP_QUEUE", 8),
+    ("IGMP_GROUP", 16),
+    ("SYS_TIMEOUT", 16),
+    ("NETDB", 320),
+    ("ND6_QUEUE", 8),
+    ("MLD6_GROUP", 32),
+    ("PBUF", 16),
+    ("PBUF_POOL", 1532),
 ];
 
 fn main() {
@@ -63,6 +113,22 @@ fn main() {
         .iter()
         .chain(VALUES)
         .map(|&(name, value)| (name.to_string(), value))
+        .collect();
+    // A host's struct pbuf is wider than the target's: size the pbuf pools for it.
+    let pointer =
+        env::var("CARGO_CFG_TARGET_POINTER_WIDTH").map_or(4, |w| w.parse::<u64>().unwrap() / 8);
+    let host_pbuf = (2 * pointer + 8).next_multiple_of(pointer);
+    let mut pools: Vec<(String, u64, u64)> = POOLS
+        .iter()
+        .enumerate()
+        .map(|(index, &(name, size))| {
+            let size = match name {
+                "PBUF" => host_pbuf,
+                "PBUF_POOL" => host_pbuf + 1516,
+                _ => size,
+            };
+            (name.to_string(), index as u64, size)
+        })
         .collect();
     if let Some(path) = env::var_os("LWIP_RUST_CONFIG") {
         println!("cargo::rerun-if-changed={}", PathBuf::from(&path).display());
@@ -83,28 +149,110 @@ fn main() {
                 .find(|(n, _)| n == name)
                 .map_or(0, |&(_, v)| v);
         }
-        for (name, value) in generated {
-            if !entries.iter().any(|(n, _)| *n == name) {
-                entries.push((name, value));
+        pools.clear();
+        let mut memp_max = None;
+        for (name, value) in &generated {
+            if let Some(pool) = name.strip_prefix("MEMP_POOL_") {
+                let size = generated
+                    .iter()
+                    .find(|(n, _)| *n == format!("MEMP_SIZE_{pool}"))
+                    .map(|&(_, v)| v)
+                    .unwrap_or_else(|| panic!("no MEMP_SIZE_{pool}"));
+                pools.push((pool.to_string(), *value, size));
+            } else if name == "MEMP_MAX" {
+                memp_max = Some(*value);
+            } else if !name.starts_with("MEMP_SIZE_") && !entries.iter().any(|(n, _)| n == name) {
+                entries.push((name.clone(), *value));
             }
         }
+        pools.sort_by_key(|&(_, index, _)| index);
+        assert_eq!(
+            memp_max,
+            Some(pools.len() as u64),
+            "MEMP_MAX does not count the pools"
+        );
         println!("cargo::rustc-cfg=lwip_layout");
+    }
+    for (position, (name, index, _)) in pools.iter().enumerate() {
+        assert_eq!(
+            *index, position as u64,
+            "memp_t values are not consecutive at {name}"
+        );
     }
 
     let value = |name: &str| entries.iter().find(|(n, _)| n == name).map(|&(_, v)| v);
+    let require = |feature: &str, name: &str, expected: u64, what: &str| {
+        let feature_on = env::var_os(format!("CARGO_FEATURE_{}", feature.to_uppercase()));
+        if feature_on.is_some() {
+            assert_eq!(value(name), Some(expected), "{feature}: {what}");
+        }
+    };
+    // LWIP_DEBUGF and LWIP_ERROR's messages are not ported: they print only with LWIP_DEBUG.
+    assert_eq!(value("LWIP_DEBUG"), Some(0), "LWIP_DEBUG is not ported");
     // inet_chksum.rs translates algorithm 2, the default, which ESP-IDF uses.
     if value("LWIP_STANDARD_CHKSUM") == Some(1) {
-        assert_eq!(
-            value("LWIP_CHKSUM_ALGORITHM"),
-            Some(2),
-            "only LWIP_CHKSUM_ALGORITHM 2 is ported"
+        require(
+            "inet_chksum",
+            "LWIP_CHKSUM_ALGORITHM",
+            2,
+            "only LWIP_CHKSUM_ALGORITHM 2 is ported",
         );
     }
-    assert_eq!(
-        value("LWIP_CHKSUM_COPY_ALGORITHM"),
-        Some(0),
-        "LWIP_CHKSUM_COPY is not ported"
+    require(
+        "inet_chksum",
+        "LWIP_CHKSUM_COPY_ALGORITHM",
+        0,
+        "LWIP_CHKSUM_COPY is not ported",
     );
+    // mem.rs and memp.rs translate the C library allocator configuration ESP-IDF uses, not
+    // lwIP's own heap and pools.
+    require(
+        "mem",
+        "MEM_LIBC_MALLOC",
+        1,
+        "only MEM_LIBC_MALLOC is ported",
+    );
+    require("mem", "MEM_USE_POOLS", 0, "MEM_USE_POOLS is not ported");
+    require(
+        "mem",
+        "MEM_OVERFLOW_CHECK",
+        0,
+        "MEM_OVERFLOW_CHECK is not ported",
+    );
+    require(
+        "mem",
+        "MEM_SANITY_CHECK",
+        0,
+        "MEM_SANITY_CHECK is not ported",
+    );
+    require("mem", "MEM_STATS", 0, "MEM_STATS is not ported");
+    require(
+        "mem",
+        "LWIP_MEM_CLIB_HEAP_CAPS",
+        0,
+        "heap_caps_malloc_prefer is not ported",
+    );
+    require(
+        "memp",
+        "MEMP_MEM_MALLOC",
+        1,
+        "only MEMP_MEM_MALLOC is ported",
+    );
+    require(
+        "memp",
+        "MEMP_OVERFLOW_CHECK",
+        0,
+        "MEMP_OVERFLOW_CHECK is not ported",
+    );
+    require("memp", "MEMP_STATS", 0, "MEMP_STATS is not ported");
+    require("pbuf", "NO_SYS", 0, "only the !NO_SYS ooseq path is ported");
+    require(
+        "pbuf",
+        "LWIP_CHECKSUM_ON_COPY",
+        0,
+        "LWIP_CHECKSUM_ON_COPY is not ported",
+    );
+    require("pbuf", "PBUF_STATS", 0, "pbuf statistics are not ported");
 
     let mut out = String::from("// Generated by build.rs from the lwIP configuration.\n");
     for (name, value) in &entries {
@@ -113,8 +261,39 @@ fn main() {
             println!("cargo::rustc-cfg={}", name.to_lowercase());
         }
     }
+    writeln!(out, "pub const MEMP_MAX: usize = {};", pools.len()).unwrap();
+    for (name, index, _) in &pools {
+        writeln!(out, "pub const MEMP_{name}: u32 = {index};").unwrap();
+    }
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
     fs::write(out_dir.join("config.rs"), out).expect("writing config.rs");
+
+    let mut out = String::from("// Generated by build.rs from lwIP's memp_std.h.\n");
+    for (name, _, size) in &pools {
+        writeln!(
+            out,
+            "/// `memp_{name}`: the {name} pool.\n\
+             #[cfg_attr(target_os = \"none\", unsafe(no_mangle))]\n\
+             pub static memp_{name}: MempDesc = MempDesc {{ size: {size} }};"
+        )
+        .unwrap();
+    }
+    writeln!(
+        out,
+        "/// `memp_pools`: every pool's descriptor, by `memp_t`."
+    )
+    .unwrap();
+    writeln!(out, "#[cfg_attr(target_os = \"none\", unsafe(no_mangle))]").unwrap();
+    writeln!(
+        out,
+        "pub static memp_pools: [&MempDesc; config::MEMP_MAX] = ["
+    )
+    .unwrap();
+    for (name, _, _) in &pools {
+        writeln!(out, "    &memp_{name},").unwrap();
+    }
+    writeln!(out, "];").unwrap();
+    fs::write(out_dir.join("memp_pools.rs"), out).expect("writing memp_pools.rs");
 }
 
 /// The `@@lwip NAME VALUE` entries in `text`.
