@@ -1,0 +1,14 @@
+# Copyright 2026 Mist Tecnologia LTDA. All rights reserved.
+
+[package]
+name = "forkpoint-libc"
+description = "Minimal freestanding C library for firmware run under Forkpoint"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+fp = { path = "../fp" }
