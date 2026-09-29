@@ -1,0 +1,25 @@
+# Copyright 2026 Mist Tecnologia LTDA. All rights reserved.
+
+[package]
+name = "lwip"
+description = "lwIP core modules in Rust, linked into the C stack module by module"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+# An rlib for host tests; the firmware build asks for a staticlib with
+# `cargo rustc --crate-type staticlib` (see ../cmake/lwip-rust.cmake).
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+fp = { path = "../third_party/fp" }
+forkpoint-libc = { path = "../third_party/libc" }
+
+# One feature per ported C file, named after it. The firmware build turns on the ones in
+# LWIP_RUST_MODULES and drops those C files.
+[features]
+def = []
+inet_chksum = []
+ip4_addr = []
