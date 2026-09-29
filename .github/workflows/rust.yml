@@ -1,0 +1,23 @@
+# Copyright 2026 Mist Tecnologia LTDA. All rights reserved.
+
+name: rust
+
+on:
+  push:
+    paths: ["rust/**", ".github/workflows/rust.yml"]
+  pull_request:
+    paths: ["rust/**", ".github/workflows/rust.yml"]
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component rustfmt,clippy --target riscv32imafc-unknown-none-elf
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --all-features --all-targets -- -D warnings
+      - run: cargo test --locked --all-features
+      - run: cargo build --locked -p lwip --all-features --target riscv32imafc-unknown-none-elf --release
