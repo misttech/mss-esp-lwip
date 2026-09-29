@@ -23,3 +23,6 @@ forkpoint-libc = { path = "../third_party/libc" }
 def = []
 inet_chksum = []
 ip4_addr = []
+mem = []
+memp = []
+pbuf = []

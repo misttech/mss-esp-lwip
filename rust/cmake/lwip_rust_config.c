@@ -15,8 +15,33 @@
 #include "lwip/opt.h"
 #include "lwip/def.h"
 #include "lwip/ip_addr.h"
+#include "lwip/mem.h"
+#include "lwip/memp.h"
 #include "lwip/netif.h"
 #include "lwip/pbuf.h"
+#include "lwip/sys.h"
+#include "lwip/stats.h"
+/* What memp.c includes, for the structs its pools hold. */
+#include "lwip/raw.h"
+#include "lwip/udp.h"
+#include "lwip/tcp.h"
+#include "lwip/priv/tcp_priv.h"
+#include "lwip/altcp.h"
+#include "lwip/ip4_frag.h"
+#include "lwip/netbuf.h"
+#include "lwip/api.h"
+#include "lwip/priv/tcpip_priv.h"
+#include "lwip/priv/api_msg.h"
+#include "lwip/priv/sockets_priv.h"
+#include "lwip/etharp.h"
+#include "lwip/igmp.h"
+#include "lwip/timeouts.h"
+#include "netif/ppp/ppp_opts.h"
+#include "lwip/netdb.h"
+#include "lwip/dns.h"
+#include "lwip/priv/nd6_priv.h"
+#include "lwip/ip6_frag.h"
+#include "lwip/mld6.h"
 
 #define ENTRY(name, value) \
   __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(value)))
@@ -123,6 +148,53 @@ void lwip_rust_config(void)
   ENTRY(LWIP_CHKSUM_COPY_ALGORITHM, 0);
 #endif
 
+  /* Memory: mem.c and memp.c are ported for the C library's allocator only. */
+  ENTRY(MEM_LIBC_MALLOC, MEM_LIBC_MALLOC);
+  ENTRY(MEMP_MEM_MALLOC, MEMP_MEM_MALLOC);
+  ENTRY(MEM_USE_POOLS, MEM_USE_POOLS);
+  ENTRY(MEM_ALIGNMENT, MEM_ALIGNMENT);
+  ENTRY(MEM_OVERFLOW_CHECK, MEM_OVERFLOW_CHECK);
+  ENTRY(MEM_SANITY_CHECK, MEM_SANITY_CHECK);
+  ENTRY(MEMP_OVERFLOW_CHECK, MEMP_OVERFLOW_CHECK);
+  ENTRY(MEM_STATS, LWIP_STATS && MEM_STATS);
+  ENTRY(MEMP_STATS, LWIP_STATS && MEMP_STATS);
+#if defined(CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP) && CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP
+  ENTRY(LWIP_MEM_CLIB_HEAP_CAPS, 1);
+#else
+  ENTRY(LWIP_MEM_CLIB_HEAP_CAPS, 0);
+#endif
+  ENTRY(SIZEOF_MEM_SIZE_T, sizeof(mem_size_t));
+  ENTRY(SIZEOF_MEMP_T, sizeof(memp_t));
+  ENTRY(SIZEOF_MEMP_DESC, sizeof(struct memp_desc));
+  ENTRY(MEMP_DESC_SIZE, offsetof(struct memp_desc, size));
+  ENTRY(MEMP_MAX, MEMP_MAX);
+  /* Each pool: its memp_t value and its descriptor's size, as memp.c declares them. */
+#define LWIP_MEMPOOL(name, num, size, desc) \
+  ENTRY(MEMP_POOL_##name, MEMP_##name); \
+  ENTRY(MEMP_SIZE_##name, LWIP_MEM_ALIGN_SIZE(size));
+#include "lwip/priv/memp_std.h"
+#if defined(ESP_LWIP) && ESP_LWIP
+  ENTRY(ESP_LWIP, 1);
+#else
+  ENTRY(ESP_LWIP, 0);
+#endif
+  ENTRY(LWIP_TCP, LWIP_TCP);
+  ENTRY(MEMP_NUM_TCP_PCB, MEMP_NUM_TCP_PCB);
+
+  /* Pbufs. */
+  ENTRY(PBUF_POOL_BUFSIZE, PBUF_POOL_BUFSIZE);
+  ENTRY(LWIP_SUPPORT_CUSTOM_PBUF, LWIP_SUPPORT_CUSTOM_PBUF);
+  ENTRY(PBUF_POOL_FREE_OOSEQ, LWIP_TCP && TCP_QUEUE_OOSEQ && PBUF_POOL_FREE_OOSEQ);
+  ENTRY(NO_SYS, NO_SYS);
+  ENTRY(LWIP_CHECKSUM_ON_COPY, LWIP_CHECKSUM_ON_COPY);
+  ENTRY(PBUF_STATS, LWIP_STATS && (MEMP_STATS || MEM_STATS));
+  ENTRY(PBUF_SPLIT_64K, LWIP_TCP && TCP_QUEUE_OOSEQ && LWIP_WND_SCALE);
+#ifdef LWIP_DEBUG
+  ENTRY(LWIP_DEBUG, 1);
+#else
+  ENTRY(LWIP_DEBUG, 0);
+#endif
+
   /* Layouts. */
   ENTRY(SIZEOF_POINTER, sizeof(void *));
   ENTRY(SIZEOF_PBUF, sizeof(struct pbuf));
@@ -134,8 +206,18 @@ void lwip_rust_config(void)
   ENTRY(PBUF_LEN, offsetof(struct pbuf, len));
   ENTRY(PBUF_TYPE_INTERNAL, offsetof(struct pbuf, type_internal));
   ENTRY(PBUF_FLAGS, offsetof(struct pbuf, flags));
-  ENTRY(PBUF_REF, offsetof(struct pbuf, ref));
+  ENTRY(PBUF_REF_COUNT, offsetof(struct pbuf, ref));
   ENTRY(PBUF_IF_IDX, offsetof(struct pbuf, if_idx));
+#if LWIP_SUPPORT_CUSTOM_PBUF
+  ENTRY(SIZEOF_PBUF_CUSTOM, sizeof(struct pbuf_custom));
+  ENTRY(PBUF_CUSTOM_FREE_FUNCTION, offsetof(struct pbuf_custom, custom_free_function));
+#endif
+#if LWIP_TCP
+  ENTRY(TCP_PCB_NEXT, offsetof(struct tcp_pcb, next));
+#if TCP_QUEUE_OOSEQ
+  ENTRY(TCP_PCB_OOSEQ, offsetof(struct tcp_pcb, ooseq));
+#endif
+#endif
 
   ENTRY(SIZEOF_IP4_ADDR, sizeof(ip4_addr_t));
 #if LWIP_IPV6

@@ -84,6 +84,79 @@ impl Pbuf {
     }
 }
 
+/// `err_t`: an lwIP error code (`s8_t`).
+pub type ErrT = i8;
+/// No error, everything OK.
+pub const ERR_OK: ErrT = 0;
+/// Out of memory error.
+pub const ERR_MEM: ErrT = -1;
+/// Illegal value.
+pub const ERR_VAL: ErrT = -6;
+/// Illegal argument.
+pub const ERR_ARG: ErrT = -16;
+
+/// `pbuf_layer`: the header room a pbuf is allocated with, in bytes (a C enum).
+pub type PbufLayer = core::ffi::c_uint;
+/// `PBUF_RAW`: no header room.
+pub const PBUF_RAW: PbufLayer = 0;
+
+/// `pbuf_type`: how a pbuf and its payload are allocated (a C enum).
+pub type PbufType = core::ffi::c_uint;
+/// Indicates that the payload directly follows the struct pbuf.
+pub const PBUF_TYPE_FLAG_STRUCT_DATA_CONTIGUOUS: u8 = 0x80;
+/// Indicates the data stored in this pbuf can change.
+pub const PBUF_TYPE_FLAG_DATA_VOLATILE: u8 = 0x40;
+/// 4 bits are reserved for 16 allocation sources: 0=heap, 1=MEMP_PBUF,
+/// 2=MEMP_PBUF_POOL.
+pub const PBUF_TYPE_ALLOC_SRC_MASK: u8 = 0x0F;
+/// Indicates this pbuf is used for RX.
+pub const PBUF_ALLOC_FLAG_RX: PbufType = 0x0100;
+/// Indicates the application needs the pbuf payload to be in one piece.
+pub const PBUF_ALLOC_FLAG_DATA_CONTIGUOUS: PbufType = 0x0200;
+/// Allocated from the heap.
+pub const PBUF_TYPE_ALLOC_SRC_MASK_STD_HEAP: u8 = 0x00;
+/// Allocated from `MEMP_PBUF`.
+pub const PBUF_TYPE_ALLOC_SRC_MASK_STD_MEMP_PBUF: u8 = 0x01;
+/// Allocated from `MEMP_PBUF_POOL`.
+pub const PBUF_TYPE_ALLOC_SRC_MASK_STD_MEMP_PBUF_POOL: u8 = 0x02;
+/// pbuf data is stored in RAM, used for TX mostly; struct pbuf and its payload are
+/// allocated in one piece of contiguous memory.
+pub const PBUF_RAM: PbufType = PBUF_ALLOC_FLAG_DATA_CONTIGUOUS
+    | PBUF_TYPE_FLAG_STRUCT_DATA_CONTIGUOUS as PbufType
+    | PBUF_TYPE_ALLOC_SRC_MASK_STD_HEAP as PbufType;
+/// pbuf data is stored in ROM, i.e. struct pbuf and its payload are located in totally
+/// different memory areas.
+pub const PBUF_ROM: PbufType = PBUF_TYPE_ALLOC_SRC_MASK_STD_MEMP_PBUF as PbufType;
+/// pbuf comes from the pbuf pool. Much like PBUF_ROM but payload might change.
+pub const PBUF_REF: PbufType =
+    (PBUF_TYPE_FLAG_DATA_VOLATILE | PBUF_TYPE_ALLOC_SRC_MASK_STD_MEMP_PBUF) as PbufType;
+/// pbuf payload refers to RAM. This one comes from a pool and should be used for RX.
+pub const PBUF_POOL: PbufType = PBUF_ALLOC_FLAG_RX
+    | PBUF_TYPE_FLAG_STRUCT_DATA_CONTIGUOUS as PbufType
+    | PBUF_TYPE_ALLOC_SRC_MASK_STD_MEMP_PBUF_POOL as PbufType;
+
+/// Indicates this is a custom pbuf: `pbuf_free` calls `pbuf_custom->custom_free_function()`
+/// when the last reference is released (plus custom PBUF_RAM cannot be trimmed).
+pub const PBUF_FLAG_IS_CUSTOM: u8 = 0x02;
+/// Indicates this pbuf includes a TCP FIN flag.
+pub const PBUF_FLAG_TCP_FIN: u8 = 0x20;
+
+/// `NETIF_NO_INDEX`: no netif.
+pub const NETIF_NO_INDEX: u8 = 0;
+
+/// Function prototype for a function to free a custom pbuf.
+pub type PbufFreeCustomFn = Option<unsafe extern "C" fn(p: *mut Pbuf)>;
+
+/// A custom pbuf (`struct pbuf_custom`): like a pbuf, but following a function pointer to
+/// free it.
+#[repr(C)]
+pub struct PbufCustom {
+    /// The actual pbuf.
+    pub pbuf: Pbuf,
+    /// This function is called when `pbuf_free` deallocates this pbuf(_custom).
+    pub custom_free_function: PbufFreeCustomFn,
+}
+
 /// The pbufs of the chain that starts at `p`, following `next`.
 ///
 /// # Safety
@@ -324,8 +397,13 @@ mod layout {
     fp::static_assert!(offset_of!(Pbuf, len) == PBUF_LEN);
     fp::static_assert!(offset_of!(Pbuf, type_internal) == PBUF_TYPE_INTERNAL);
     fp::static_assert!(offset_of!(Pbuf, flags) == PBUF_FLAGS);
-    fp::static_assert!(offset_of!(Pbuf, ref_) == PBUF_REF);
+    fp::static_assert!(offset_of!(Pbuf, ref_) == PBUF_REF_COUNT);
     fp::static_assert!(offset_of!(Pbuf, if_idx) == PBUF_IF_IDX);
+
+    #[cfg(lwip_support_custom_pbuf)]
+    fp::static_assert!(size_of::<PbufCustom>() == SIZEOF_PBUF_CUSTOM);
+    #[cfg(lwip_support_custom_pbuf)]
+    fp::static_assert!(offset_of!(PbufCustom, custom_free_function) == PBUF_CUSTOM_FREE_FUNCTION);
 
     fp::static_assert!(size_of::<Ip4Addr>() == SIZEOF_IP4_ADDR);
     #[cfg(lwip_ipv6)]
