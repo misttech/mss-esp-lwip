@@ -398,7 +398,7 @@ unsafe fn tcp_write_checks(pcb: *mut TcpPcb, len: u16) -> ErrT {
 ///
 /// `pcb` is null or live, and `arg` readable for `len` bytes (for as long as the stack
 /// references it without `TCP_WRITE_FLAG_COPY`).
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_write(
     pcb: *mut TcpPcb,
     arg: *const c_void,
@@ -709,7 +709,7 @@ pub unsafe extern "C" fn tcp_write(
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_split_unsent_seg(pcb: *mut TcpPcb, split: u16) -> ErrT {
     lwip_assert!("tcp_split_unsent_seg: invalid pcb", !pcb.is_null());
 
@@ -827,7 +827,7 @@ pub unsafe extern "C" fn tcp_split_unsent_seg(pcb: *mut TcpPcb, split: u16) -> E
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_send_fin(pcb: *mut TcpPcb) -> ErrT {
     lwip_assert!("tcp_send_fin: invalid pcb", !pcb.is_null());
 
@@ -861,7 +861,7 @@ pub unsafe extern "C" fn tcp_send_fin(pcb: *mut TcpPcb) -> ErrT {
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_enqueue_flags(pcb: *mut TcpPcb, flags: u8) -> ErrT {
     lwip_assert!(
         "tcp_enqueue_flags: need either TCP_SYN or TCP_FIN in flags (programmer violates API)",
@@ -946,7 +946,7 @@ pub unsafe extern "C" fn tcp_enqueue_flags(pcb: *mut TcpPcb, flags: u8) -> ErrT 
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_output(pcb: *mut TcpPcb) -> ErrT {
     lwip_assert!("tcp_output: invalid pcb", !pcb.is_null());
     // SAFETY: as the caller guarantees; segments on the PCB's queues are live.
@@ -1228,7 +1228,7 @@ unsafe fn tcp_output_segment(seg: *mut TcpSeg, pcb: *mut TcpPcb, netif: *mut Net
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_rexmit_rto_prepare(pcb: *mut TcpPcb) -> ErrT {
     lwip_assert!("tcp_rexmit_rto_prepare: invalid pcb", !pcb.is_null());
 
@@ -1276,7 +1276,7 @@ pub unsafe extern "C" fn tcp_rexmit_rto_prepare(pcb: *mut TcpPcb) -> ErrT {
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_rexmit_rto_commit(pcb: *mut TcpPcb) {
     lwip_assert!("tcp_rexmit_rto_commit: invalid pcb", !pcb.is_null());
 
@@ -1297,7 +1297,7 @@ pub unsafe extern "C" fn tcp_rexmit_rto_commit(pcb: *mut TcpPcb) {
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_rexmit_rto(pcb: *mut TcpPcb) {
     lwip_assert!("tcp_rexmit_rto: invalid pcb", !pcb.is_null());
 
@@ -1316,7 +1316,7 @@ pub unsafe extern "C" fn tcp_rexmit_rto(pcb: *mut TcpPcb) {
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_rexmit(pcb: *mut TcpPcb) -> ErrT {
     lwip_assert!("tcp_rexmit: invalid pcb", !pcb.is_null());
 
@@ -1364,7 +1364,7 @@ pub unsafe extern "C" fn tcp_rexmit(pcb: *mut TcpPcb) -> ErrT {
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_rexmit_fast(pcb: *mut TcpPcb) {
     lwip_assert!("tcp_rexmit_fast: invalid pcb", !pcb.is_null());
 
@@ -1589,7 +1589,7 @@ unsafe fn tcp_rst_common(
 /// # Safety
 ///
 /// `pcb` is null or live, and `local_ip` and `remote_ip` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_rst(
     pcb: *const TcpPcb,
     seqno: u32,
@@ -1625,7 +1625,7 @@ pub unsafe extern "C" fn tcp_rst(
 /// # Safety
 ///
 /// `netif` is null or live, and `local_ip` and `remote_ip` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_rst_netif(
     netif: *mut Netif,
     seqno: u32,
@@ -1659,7 +1659,7 @@ pub unsafe extern "C" fn tcp_rst_netif(
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_send_empty_ack(pcb: *mut TcpPcb) -> ErrT {
     lwip_assert!("tcp_send_empty_ack: invalid pcb", !pcb.is_null());
 
@@ -1697,7 +1697,7 @@ pub unsafe extern "C" fn tcp_send_empty_ack(pcb: *mut TcpPcb) -> ErrT {
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_keepalive(pcb: *mut TcpPcb) -> ErrT {
     let optlen = u16::from(lwip_tcp_opt_length(0));
 
@@ -1722,7 +1722,7 @@ pub unsafe extern "C" fn tcp_keepalive(pcb: *mut TcpPcb) -> ErrT {
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_zero_window_probe(pcb: *mut TcpPcb) -> ErrT {
     let optlen = u16::from(lwip_tcp_opt_length(0));
 

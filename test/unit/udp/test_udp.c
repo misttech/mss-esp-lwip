@@ -4,8 +4,8 @@
 #include "lwip/stats.h"
 #include "lwip/inet_chksum.h"
 
-#if !LWIP_STATS || !UDP_STATS || !MEMP_STATS
-#error "This tests needs UDP- and MEMP-statistics enabled"
+#if !LWIP_STATS || !MEMP_STATS
+#error "This tests needs MEMP-statistics enabled"
 #endif
 
 struct test_udp_rxdata {

@@ -32,7 +32,9 @@
 //! Dynamic pool memory manager, from `src/core/memp.c`, for `MEMP_MEM_MALLOC`: each pool
 //! allocates its elements with `mem_malloc`, so a pool is only its element size. That is
 //! the configuration ESP-IDF uses and the only one ported; `build.rs` refuses lwIP's
-//! static pools, overflow checks, and statistics.
+//! static pools and overflow checks. With `MEMP_STATS`, each pool counts its elements in
+//! use, the most ever in use, and its failed allocations, and `memp_init` hands the
+//! counters to `lwip_stats`.
 //!
 //! The pools are those `lwip/priv/memp_std.h` declares for the configuration, and
 //! `build.rs` generates their descriptors from it. ESP-IDF's lwIP also caps the TCP PCBs
@@ -55,12 +57,22 @@ use crate::mem::mem_align_size;
 pub type MempT = core::ffi::c_uint;
 
 /// `struct memp_desc`: a memory pool descriptor. Under `MEMP_MEM_MALLOC`, without overflow
-/// checks or statistics, only the element size.
+/// checks, the element size, and the pool's name and statistics when they are kept.
 #[repr(C)]
 pub struct MempDesc {
+    /// Textual description, for `LWIP_STATS_DISPLAY`.
+    #[cfg(lwip_stats_display)]
+    pub desc: *const core::ffi::c_char,
+    /// Statistics.
+    #[cfg(memp_stats)]
+    pub stats: *mut crate::stats::StatsMem,
     /// Element size.
     pub size: u16,
 }
+
+// SAFETY: a descriptor is immutable; its statistics are only written inside the critical
+// section.
+unsafe impl Sync for MempDesc {}
 
 #[cfg(lwip_layout)]
 mod layout {
@@ -71,6 +83,10 @@ mod layout {
 
     fp::static_assert!(size_of::<MempDesc>() == SIZEOF_MEMP_DESC);
     fp::static_assert!(offset_of!(MempDesc, size) == MEMP_DESC_SIZE);
+    #[cfg(lwip_stats_display)]
+    fp::static_assert!(offset_of!(MempDesc, desc) == MEMP_DESC_DESC);
+    #[cfg(memp_stats)]
+    fp::static_assert!(offset_of!(MempDesc, stats) == MEMP_DESC_STATS);
     fp::static_assert!(size_of::<MempT>() == SIZEOF_MEMP_T);
 }
 
@@ -80,12 +96,31 @@ mod pools {
 
     use super::MempDesc;
     use crate::config;
+    #[cfg(memp_stats)]
+    use crate::global::Global;
+    #[cfg(memp_stats)]
+    use crate::stats::StatsMem;
 
     include!(concat!(env!("OUT_DIR"), "/memp_pools.rs"));
 }
 
 #[cfg(feature = "memp")]
 pub use pools::*;
+
+/// `MEMP_STATS_DEC(err, type_)`: take back a failed allocation `tcp_alloc` retried.
+///
+/// # Safety
+///
+/// `type_` is below MEMP_MAX, and `memp_init` has run.
+#[cfg(memp_stats)]
+pub(crate) unsafe fn memp_stats_dec_err(type_: MempT) {
+    // SAFETY: `lwip_stats.memp[type_]` points at the pool's statistics, per the caller.
+    // Like STATS_DEC, outside the critical section.
+    unsafe {
+        let stats = *crate::stats::memp_slot(type_ as usize);
+        (*stats).err = (*stats).err.wrapping_sub(1);
+    }
+}
 
 /// The TCP PCBs allocated and not yet freed, for ESP-IDF's cap.
 #[cfg(all(feature = "memp", esp_lwip, lwip_tcp))]
@@ -97,20 +132,37 @@ fn is_tcp_pcb_pool(desc: &MempDesc) -> bool {
     core::ptr::eq(desc, memp_pools[config::MEMP_TCP_PCB as usize])
 }
 
-/// Initialize a custom memory pool. Nothing to do: elements come from `mem_malloc`.
+/// Initialize a custom memory pool. Elements come from `mem_malloc`, so there is nothing
+/// to carve out; the statistics take the pool's name.
+///
+/// # Safety
+///
+/// `desc` is a pool descriptor.
 #[cfg(feature = "memp")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
-pub extern "C" fn memp_init_pool(desc: *const MempDesc) {
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
+pub unsafe extern "C" fn memp_init_pool(desc: *const MempDesc) {
+    #[cfg(all(memp_stats, lwip_stats_display))]
+    // SAFETY: a descriptor, per the caller, whose statistics nothing else writes yet.
+    unsafe {
+        (*(*desc).stats).name = (*desc).desc;
+    }
     let _ = desc;
 }
 
 /// Initializes lwIP built-in pools.
 #[cfg(feature = "memp")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn memp_init() {
     // For every pool:
-    for desc in memp_pools {
-        memp_init_pool(desc);
+    for (i, desc) in memp_pools.iter().enumerate() {
+        // SAFETY: one of the pool descriptors.
+        unsafe { memp_init_pool(*desc) };
+        #[cfg(memp_stats)]
+        // SAFETY: `i` is below MEMP_MAX.
+        unsafe {
+            *crate::stats::memp_slot(i) = desc.stats;
+        }
+        let _ = i;
     }
 }
 
@@ -130,7 +182,11 @@ fn do_memp_malloc_pool(desc: &MempDesc) -> *mut c_void {
     let memp = unsafe { mem_malloc(mem_align_size(usize::from(desc.size))) };
     crate::sys::locked(|| {
         if memp.is_null() {
-            // MEMP_STATS_INC(err): no statistics.
+            #[cfg(memp_stats)]
+            // SAFETY: the pool's statistics, written only inside the critical section.
+            unsafe {
+                (*desc.stats).err = (*desc.stats).err.wrapping_add(1);
+            }
             return core::ptr::null_mut();
         }
         #[cfg(all(esp_lwip, lwip_tcp))]
@@ -141,6 +197,11 @@ fn do_memp_malloc_pool(desc: &MempDesc) -> *mut c_void {
             "memp_malloc: memp properly aligned",
             memp.addr().is_multiple_of(config::MEM_ALIGNMENT)
         );
+        #[cfg(memp_stats)]
+        // SAFETY: as above.
+        unsafe {
+            (*desc.stats).inc_used(1);
+        }
         memp
     })
 }
@@ -151,7 +212,7 @@ fn do_memp_malloc_pool(desc: &MempDesc) -> *mut c_void {
 ///
 /// `desc` is null or one of the pool descriptors.
 #[cfg(feature = "memp")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn memp_malloc_pool(desc: *const MempDesc) -> *mut c_void {
     lwip_assert!("invalid pool desc", !desc.is_null());
     // SAFETY: null or a pool descriptor, per the caller.
@@ -165,7 +226,7 @@ pub unsafe extern "C" fn memp_malloc_pool(desc: *const MempDesc) -> *mut c_void 
 ///
 /// Returns a pointer to the allocated memory or null on error.
 #[cfg(feature = "memp")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn memp_malloc(type_: MempT) -> *mut c_void {
     // LWIP_ERROR("memp_malloc: type < MEMP_MAX", (type < MEMP_MAX), return NULL;)
     match memp_pools.get(type_ as usize) {
@@ -193,6 +254,11 @@ unsafe fn do_memp_free_pool(desc: &MempDesc, mem: *mut c_void) {
             use core::sync::atomic::Ordering::Relaxed;
             NUM_TCP_PCB.store(NUM_TCP_PCB.load(Relaxed).wrapping_sub(1), Relaxed);
         }
+        #[cfg(memp_stats)]
+        // SAFETY: the pool's statistics, written only inside the critical section.
+        unsafe {
+            (*desc.stats).used = (*desc.stats).used.wrapping_sub(1);
+        }
         let _ = desc;
     });
     // SAFETY: `memp` came from `mem_malloc`, per the caller.
@@ -206,7 +272,7 @@ unsafe fn do_memp_free_pool(desc: &MempDesc, mem: *mut c_void) {
 /// `desc` is null or one of the pool descriptors; `mem` is null or was allocated from it
 /// and not freed since.
 #[cfg(feature = "memp")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn memp_free_pool(desc: *const MempDesc, mem: *mut c_void) {
     lwip_assert!("invalid pool desc", !desc.is_null());
     // SAFETY: null or a pool descriptor, per the caller.
@@ -226,7 +292,7 @@ pub unsafe extern "C" fn memp_free_pool(desc: *const MempDesc, mem: *mut c_void)
 ///
 /// `mem` is null or was allocated from the pool `type_` and not freed since.
 #[cfg(feature = "memp")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn memp_free(type_: MempT, mem: *mut c_void) {
     // LWIP_ERROR("memp_free: type < MEMP_MAX", (type < MEMP_MAX), return;)
     let Some(desc) = memp_pools.get(type_ as usize) else {

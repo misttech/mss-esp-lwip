@@ -14,6 +14,7 @@ Ethernet frame) is identical.
 | `esp-idf/lwip/` | ESP-IDF's `lwip` component, built from this tree with Rust modules |
 | `third_party/fp/` | Zero-dependency `no_std` building blocks (`static_assert!`) |
 | `third_party/libc/` | Forkpoint's C library, which the Rust modules take everything they need from a C library from |
+| `test/unit/` | lwIP's own unit tests, run against the Rust modules |
 
 See `PORTING.md` for how a module is ported and `UNSAFE.md` for the `unsafe`
 count per module.
@@ -44,6 +45,9 @@ count per module.
 is the C library's allocator and each pool allocates from it; `build.rs`
 refuses lwIP's own heap and static pools. `memp.rs`'s pool descriptors are
 generated from the configuration's `memp_std.h`, as `memp.c` declares them.
+With `MEM_STATS` and `MEMP_STATS`, both keep their statistics in `lwip_stats`
+as the C files do; no module counts the protocols' statistics, and `build.rs`
+refuses a configuration that has a ported module count them.
 `netif`, `ethernet`, `etharp`, `ip4`, `ip4_frag`, `icmp`, `udp`, `dns`, `dhcp`,
 `tcp`, and `tcp_out` are ported as ESP-IDF configures them; `build.rs` lists the
 options each requires and refuses a configuration that selects code they do not
@@ -89,3 +93,33 @@ cargo clippy --all-features --all-targets -- -D warnings
 cargo test --all-features
 cargo build -p lwip --all-features --target riscv32imafc-unknown-none-elf --release
 ```
+
+## lwIP's unit tests
+
+`test/unit/run.sh` runs lwIP's own C unit tests (`../test/unit`) against the
+Rust modules. It builds them twice, as `contrib/ports/unix/check` does, once all
+C and once with every ported module (or those in `LWIP_RUST_MODULES`) in place
+of its C file, and fails unless each test has the same result in both: the same
+pass, or the same failure with the same message.
+
+```bash
+test/unit/run.sh                 # builds under target/unittests
+```
+
+Both builds use `test/unit/lwipopts.h`: the tests' own options, with every
+option the modules port only one way set as ESP-IDF sets it (the C library's
+allocator, source routing, single-pbuf transmission, and so on), and with the
+heap and pool statistics the tests check for leaks. A few tests expect lwIP's
+defaults for those options instead, and fail in the all-C build too;
+`test/unit/expected-failures.txt` lists each with the option it expects
+otherwise, and `run.sh` also fails if the all-C build fails any other test.
+The upstream tests are adapted where these options kept them from building or
+checking: `test_pbuf.c`'s 64 KiB split tests are left out without window
+scaling, and `test_ip4.c`'s reassembly test without reassembly; files that
+required protocol statistics they never read no longer do; the leak check
+leaves out the heap that skipped pools hold when pools allocate from the heap;
+and `esp_platform_hooks.c` builds with `LWIP_NETIF_HOSTNAME`.
+
+The script needs cmake, ninja, a C compiler, cargo, and the check library
+(`apt install check`, or `CMAKE_PREFIX_PATH` naming where it is installed).
+

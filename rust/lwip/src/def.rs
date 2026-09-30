@@ -58,14 +58,14 @@ pub fn htonl(n: u32) -> u32 {
 
 /// `lwip_htons`: [`htons`] for C.
 #[cfg(all(target_endian = "little", lwip_htons_fn))]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn lwip_htons(n: u16) -> u16 {
     htons(n)
 }
 
 /// `lwip_htonl`: [`htonl`] for C.
 #[cfg(all(target_endian = "little", lwip_htonl_fn))]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn lwip_htonl(n: u32) -> u32 {
     htonl(n)
 }
@@ -121,7 +121,7 @@ unsafe fn find(
 ///
 /// `buffer` and `token` are NUL-terminated strings.
 #[cfg(lwip_strnstr_fn)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn lwip_strnstr(
     buffer: *const c_char,
     token: *const c_char,
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn lwip_strnstr(
 ///
 /// `buffer` and `token` are NUL-terminated strings.
 #[cfg(lwip_strnistr_fn)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn lwip_strnistr(
     buffer: *const c_char,
     token: *const c_char,
@@ -189,7 +189,7 @@ unsafe fn strnicmp(str1: Cursor, str2: Cursor, mut len: usize) -> c_int {
 ///
 /// `str1` and `str2` are NUL-terminated strings.
 #[cfg(lwip_stricmp_fn)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn lwip_stricmp(str1: *const c_char, str2: *const c_char) -> c_int {
     // SAFETY: both are NUL-terminated, per the caller, and a `len` of 0 never ends the
     // comparison before a NUL or a difference.
@@ -202,7 +202,7 @@ pub unsafe extern "C" fn lwip_stricmp(str1: *const c_char, str2: *const c_char) 
 ///
 /// `str1` and `str2` are NUL-terminated strings, or readable for `len` bytes.
 #[cfg(lwip_strnicmp_fn)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn lwip_strnicmp(
     str1: *const c_char,
     str2: *const c_char,
@@ -267,7 +267,7 @@ pub fn itoa(result: &mut [u8], number: c_int) {
 ///
 /// `result` is writable for `bufsize` bytes.
 #[cfg(lwip_itoa_fn)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn lwip_itoa(result: *mut c_char, bufsize: usize, number: c_int) {
     if bufsize == 0 {
         return;

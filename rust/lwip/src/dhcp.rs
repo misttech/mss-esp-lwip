@@ -330,7 +330,7 @@ unsafe fn dhcp_dec_pcb_refcount() {
 /// # Safety
 ///
 /// `arg` is null or a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_fine_timeout_cb(arg: *mut c_void) {
     // SAFETY: as the caller guarantees.
     unsafe { dhcp_fine_tmr(arg.cast()) };
@@ -526,7 +526,7 @@ unsafe fn dhcp_select(netif: *mut Netif) -> ErrT {
 
 /// The DHCP timer that checks for lease renewal/rebind timeouts. Must be called once a
 /// minute (see `DHCP_COARSE_TIMER_SECS`).
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn dhcp_coarse_tmr() {
     // SAFETY: netifs on the list are live, and so is their DHCP state.
     unsafe {
@@ -577,7 +577,7 @@ pub extern "C" fn dhcp_coarse_tmr() {
 /// # Safety
 ///
 /// `netif` is null or a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_fine_tmr(netif: *mut Netif) {
     if netif.is_null() {
         return;
@@ -777,7 +777,7 @@ unsafe fn dhcp_handle_ack(netif: *mut Netif, msg_in: *const u8) {
 /// # Safety
 ///
 /// `netif` is a live netif without DHCP, and `dhcp` writable and outlives its use.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_set_struct(netif: *mut Netif, dhcp: *mut Dhcp) {
     lwip_assert!("netif != NULL", !netif.is_null());
     lwip_assert!("dhcp != NULL", !dhcp.is_null());
@@ -803,7 +803,7 @@ pub unsafe extern "C" fn dhcp_set_struct(netif: *mut Netif, dhcp: *mut Dhcp) {
 /// # Safety
 ///
 /// `netif` is a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_cleanup(netif: *mut Netif) {
     lwip_assert!("netif != NULL", !netif.is_null());
     // SAFETY: as the caller guarantees; a struct dhcp without the external flag came
@@ -831,7 +831,7 @@ pub unsafe extern "C" fn dhcp_cleanup(netif: *mut Netif) {
 /// # Safety
 ///
 /// `netif` is null or a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_start(netif: *mut Netif) -> ErrT {
     // LWIP_ERROR("netif != NULL", (netif != NULL), return ERR_ARG;);
     if netif.is_null() {
@@ -905,7 +905,7 @@ pub unsafe extern "C" fn dhcp_start(netif: *mut Netif) -> ErrT {
 /// # Safety
 ///
 /// `netif` is null or a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_inform(netif: *mut Netif) {
     // LWIP_ERROR("netif != NULL", (netif != NULL), return;);
     if netif.is_null() {
@@ -956,7 +956,7 @@ pub unsafe extern "C" fn dhcp_inform(netif: *mut Netif) {
 /// # Safety
 ///
 /// `netif` is a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_network_changed_link_up(netif: *mut Netif) {
     // SAFETY: as the caller guarantees.
     unsafe {
@@ -1164,7 +1164,7 @@ unsafe fn dhcp_bind(netif: *mut Netif) {
 /// # Safety
 ///
 /// `netif` is a live netif with DHCP.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_renew(netif: *mut Netif) -> ErrT {
     // SAFETY: as the caller guarantees.
     unsafe {
@@ -1339,7 +1339,7 @@ unsafe fn dhcp_reboot(netif: *mut Netif) -> ErrT {
 /// # Safety
 ///
 /// `netif` is a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_release_and_stop(netif: *mut Netif) {
     // SAFETY: as the caller guarantees.
     unsafe {
@@ -1418,7 +1418,7 @@ pub unsafe extern "C" fn dhcp_release_and_stop(netif: *mut Netif) {
 /// # Safety
 ///
 /// `netif` is a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_release(netif: *mut Netif) -> ErrT {
     // SAFETY: forwarded from the caller.
     unsafe { dhcp_release_and_stop(netif) };
@@ -1431,7 +1431,7 @@ pub unsafe extern "C" fn dhcp_release(netif: *mut Netif) -> ErrT {
 /// # Safety
 ///
 /// `netif` is a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_stop(netif: *mut Netif) {
     // SAFETY: forwarded from the caller.
     unsafe { dhcp_release_and_stop(netif) };
@@ -2055,7 +2055,7 @@ unsafe fn dhcp_option_trailer(mut options_out_len: u16, msg: *mut u8, p_out: *mu
 /// # Safety
 ///
 /// `netif` is null or a live netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dhcp_supplied_address(netif: *const Netif) -> u8 {
     if netif.is_null() {
         return 0;

@@ -10,9 +10,11 @@
 
 #include "lwip/tcpip.h"
 
-#if !LWIP_IPV4 || !IP_REASSEMBLY || !MIB2_STATS || !IPFRAG_STATS
-#error "This tests needs LWIP_IPV4, IP_REASSEMBLY; MIB2- and IPFRAG-statistics enabled"
+#if !LWIP_IPV4
+#error "This tests needs LWIP_IPV4"
 #endif
+/* The reassembly test needs IP_REASSEMBLY, MIB2- and IPFRAG-statistics. */
+#define TEST_IP4_REASS (IP_REASSEMBLY && MIB2_STATS && IPFRAG_STATS)
 
 static struct netif test_netif;
 static ip4_addr_t test_ipaddr, test_netmask, test_gw;
@@ -70,6 +72,7 @@ test_netif_remove(void)
 }
 
 /* Helper functions */
+#if TEST_IP4_REASS
 static void
 create_ip4_input_fragment(u16_t ip_id, u16_t start, u16_t len, int last)
 {
@@ -108,6 +111,7 @@ create_ip4_input_fragment(u16_t ip_id, u16_t start, u16_t len, int last)
     fail_unless(err == ERR_OK);
   }
 }
+#endif /* TEST_IP4_REASS */
 
 static err_t arpless_output(struct netif *netif, struct pbuf *p,
                             const ip4_addr_t *ipaddr) {
@@ -162,6 +166,7 @@ START_TEST(test_ip4_frag)
 }
 END_TEST
 
+#if TEST_IP4_REASS
 START_TEST(test_ip4_reass)
 {
   const u16_t ip_id = 128;
@@ -235,6 +240,8 @@ START_TEST(test_ip4_reass)
 END_TEST
 
 /* packets to 127.0.0.1 shall not be sent out to netif_default */
+#endif /* TEST_IP4_REASS */
+
 START_TEST(test_127_0_0_1)
 {
   ip4_addr_t localhost;
@@ -332,7 +339,9 @@ ip4_suite(void)
 {
   testfunc tests[] = {
     TESTFUNC(test_ip4_frag),
+#if TEST_IP4_REASS
     TESTFUNC(test_ip4_reass),
+#endif
     TESTFUNC(test_127_0_0_1),
     TESTFUNC(test_ip4addr_aton),
     TESTFUNC(test_ip4_icmp_replylen_short),

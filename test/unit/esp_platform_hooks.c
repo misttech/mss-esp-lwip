@@ -148,7 +148,7 @@ void dhcp_append_extra_opts(struct netif *netif, uint8_t state, struct dhcp_msg 
 #if LWIP_NETIF_HOSTNAME
       if (netif->hostname != NULL && strlen(netif->hostname) < 0xff) {
         p = netif->hostname;
-        len = (u8_t)namelen;
+        len = (u8_t)strlen(netif->hostname);
       }
 #endif /* LWIP_NETIF_HOSTNAME */
     }

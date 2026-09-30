@@ -78,7 +78,7 @@ const PBUF_POOL_BUFSIZE_ALIGNED: usize = mem_align_size(config::PBUF_POOL_BUFSIZ
 /// TCP segments is queued; cleared when it runs (`volatile u8_t` in C).
 #[cfg(pbuf_pool_free_ooseq)]
 #[allow(non_upper_case_globals)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static pbuf_free_ooseq_pending: AtomicU8 = AtomicU8::new(0);
 
 #[cfg(pbuf_pool_free_ooseq)]
@@ -197,7 +197,7 @@ unsafe fn pbuf_init_alloced_pbuf(
 ///
 /// Returns the allocated pbuf. If multiple pbufs where allocated, this is the first pbuf
 /// of a pbuf chain.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn pbuf_alloc(layer: PbufLayer, length: u16, type_: PbufType) -> *mut Pbuf {
     let mut offset = layer as u16;
     match type_ {
@@ -309,7 +309,7 @@ pub extern "C" fn pbuf_alloc(layer: PbufLayer, length: u16, type_: PbufType) -> 
 ///
 /// `payload` is null or valid for `length` bytes for as long as the pbuf refers to it:
 /// the stack reads it, and for `PBUF_REF` may write it, through the pbuf.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_alloc_reference(
     payload: *mut c_void,
     length: u16,
@@ -342,7 +342,7 @@ pub unsafe extern "C" fn pbuf_alloc_reference(
 /// `p` is writable for a `struct pbuf_custom`, and `payload_mem` is null or valid for
 /// `payload_mem_len` bytes.
 #[cfg(lwip_support_custom_pbuf)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_alloced_custom(
     l: PbufLayer,
     length: u16,
@@ -385,7 +385,7 @@ pub unsafe extern "C" fn pbuf_alloced_custom(
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_realloc(p: *mut Pbuf, new_len: u16) {
     lwip_assert!("pbuf_realloc: p != NULL", !p.is_null());
 
@@ -514,7 +514,7 @@ unsafe fn pbuf_add_header_impl(p: *mut Pbuf, header_size_increment: usize, force
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_add_header(p: *mut Pbuf, header_size_increment: usize) -> u8 {
     // SAFETY: forwarded from the caller.
     unsafe { pbuf_add_header_impl(p, header_size_increment, false) }
@@ -526,7 +526,7 @@ pub unsafe extern "C" fn pbuf_add_header(p: *mut Pbuf, header_size_increment: us
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_add_header_force(p: *mut Pbuf, header_size_increment: usize) -> u8 {
     // SAFETY: forwarded from the caller.
     unsafe { pbuf_add_header_impl(p, header_size_increment, true) }
@@ -542,7 +542,7 @@ pub unsafe extern "C" fn pbuf_add_header_force(p: *mut Pbuf, header_size_increme
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_remove_header(p: *mut Pbuf, header_size_decrement: usize) -> u8 {
     lwip_assert!("p != NULL", !p.is_null());
     if p.is_null() || header_size_decrement > 0xFFFF {
@@ -598,7 +598,7 @@ unsafe fn pbuf_header_impl(p: *mut Pbuf, header_size_increment: i16, force: bool
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_header(p: *mut Pbuf, header_size_increment: i16) -> u8 {
     // SAFETY: forwarded from the caller.
     unsafe { pbuf_header_impl(p, header_size_increment, false) }
@@ -610,7 +610,7 @@ pub unsafe extern "C" fn pbuf_header(p: *mut Pbuf, header_size_increment: i16) -
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_header_force(p: *mut Pbuf, header_size_increment: i16) -> u8 {
     // SAFETY: forwarded from the caller.
     unsafe { pbuf_header_impl(p, header_size_increment, true) }
@@ -623,7 +623,7 @@ pub unsafe extern "C" fn pbuf_header_force(p: *mut Pbuf, header_size_increment: 
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_free_header(q: *mut Pbuf, size: u16) -> *mut Pbuf {
     let mut p = q;
     let mut free_left = size;
@@ -659,7 +659,7 @@ pub unsafe extern "C" fn pbuf_free_header(q: *mut Pbuf, size: u16) -> *mut Pbuf 
 ///
 /// See the module's safety section; each pbuf's allocation source and custom free
 /// function are as it was allocated with.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_free(p: *mut Pbuf) -> u8 {
     if p.is_null() {
         lwip_assert!("p != NULL", !p.is_null());
@@ -728,7 +728,7 @@ pub unsafe extern "C" fn pbuf_free(p: *mut Pbuf) -> u8 {
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_clen(p: *const Pbuf) -> u16 {
     // SAFETY: forwarded from the caller.
     unsafe { crate::types::pbuf_iter(p) }.fold(0_u16, |len, _| len.wrapping_add(1))
@@ -739,7 +739,7 @@ pub unsafe extern "C" fn pbuf_clen(p: *const Pbuf) -> u16 {
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_ref(p: *mut Pbuf) {
     // Pbuf given?
     if !p.is_null() {
@@ -760,7 +760,7 @@ pub unsafe extern "C" fn pbuf_ref(p: *mut Pbuf) {
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_cat(h: *mut Pbuf, t: *mut Pbuf) {
     // LWIP_ERROR("(h != NULL) && (t != NULL) (programmer violates API)", ..., return;)
     if h.is_null() || t.is_null() {
@@ -799,7 +799,7 @@ pub unsafe extern "C" fn pbuf_cat(h: *mut Pbuf, t: *mut Pbuf) {
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_chain(h: *mut Pbuf, t: *mut Pbuf) {
     // SAFETY: forwarded from the caller.
     unsafe {
@@ -819,7 +819,7 @@ pub unsafe extern "C" fn pbuf_chain(h: *mut Pbuf, t: *mut Pbuf) {
 /// # Safety
 ///
 /// See the module's safety section; `p` is not null.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_dechain(p: *mut Pbuf) -> *mut Pbuf {
     let mut tail_gone: u8 = 1;
     // SAFETY: a well-formed chain, per the caller.
@@ -860,7 +860,7 @@ pub unsafe extern "C" fn pbuf_dechain(p: *mut Pbuf) -> *mut Pbuf {
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_copy(p_to: *mut Pbuf, p_from: *const Pbuf) -> ErrT {
     // LWIP_ERROR("pbuf_copy: invalid source", p_from != NULL, return ERR_ARG;)
     if p_from.is_null() {
@@ -879,7 +879,7 @@ pub unsafe extern "C" fn pbuf_copy(p_to: *mut Pbuf, p_from: *const Pbuf) -> ErrT
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_copy_partial_pbuf(
     p_to: *mut Pbuf,
     p_from: *const Pbuf,
@@ -981,7 +981,7 @@ pub unsafe extern "C" fn pbuf_copy_partial_pbuf(
 /// # Safety
 ///
 /// See the module's safety section; `dataptr` is null or writable for `len` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_copy_partial(
     buf: *const Pbuf,
     dataptr: *mut c_void,
@@ -1040,7 +1040,7 @@ pub unsafe extern "C" fn pbuf_copy_partial(
 /// # Safety
 ///
 /// See the module's safety section; `buffer` is null or writable for `bufsize` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_get_contiguous(
     p: *const Pbuf,
     buffer: *mut c_void,
@@ -1082,7 +1082,7 @@ pub unsafe extern "C" fn pbuf_get_contiguous(
 ///
 /// See the module's safety section; `rest` is writable.
 #[cfg(any(pbuf_split_64k, test))]
-#[cfg_attr(all(target_os = "none", pbuf_split_64k), unsafe(no_mangle))]
+#[cfg_attr(all(lwip_export, pbuf_split_64k), unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_split_64k(p: *mut Pbuf, rest: *mut *mut Pbuf) {
     // SAFETY: a well-formed chain and a writable `rest`, per the caller.
     unsafe {
@@ -1165,7 +1165,7 @@ unsafe fn pbuf_skip_const(
 /// # Safety
 ///
 /// See the module's safety section; `out_offset` is null or writable.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_skip(
     in_: *mut Pbuf,
     in_offset: u16,
@@ -1183,7 +1183,7 @@ pub unsafe extern "C" fn pbuf_skip(
 /// # Safety
 ///
 /// See the module's safety section; `dataptr` is null or readable for `len` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_take(buf: *mut Pbuf, dataptr: *const c_void, len: u16) -> ErrT {
     let mut total_copy_len = usize::from(len);
     let mut copied_total: usize = 0;
@@ -1232,7 +1232,7 @@ pub unsafe extern "C" fn pbuf_take(buf: *mut Pbuf, dataptr: *const c_void, len: 
 /// # Safety
 ///
 /// See the module's safety section; `dataptr` is readable for `len` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_take_at(
     buf: *mut Pbuf,
     dataptr: *const c_void,
@@ -1273,7 +1273,7 @@ pub unsafe extern "C" fn pbuf_take_at(
 /// # Safety
 ///
 /// See the module's safety section; `p` is not null.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_coalesce(p: *mut Pbuf, layer: PbufLayer) -> *mut Pbuf {
     // SAFETY: a well-formed chain, per the caller.
     unsafe {
@@ -1298,7 +1298,7 @@ pub unsafe extern "C" fn pbuf_coalesce(p: *mut Pbuf, layer: PbufLayer) -> *mut P
 /// # Safety
 ///
 /// See the module's safety section; `p` is not null.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_clone(layer: PbufLayer, type_: PbufType, p: *mut Pbuf) -> *mut Pbuf {
     // SAFETY: a well-formed chain, per the caller.
     unsafe {
@@ -1321,7 +1321,7 @@ pub unsafe extern "C" fn pbuf_clone(layer: PbufLayer, type_: PbufType, p: *mut P
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_get_at(p: *const Pbuf, offset: u16) -> u8 {
     // SAFETY: forwarded from the caller.
     let ret = unsafe { pbuf_try_get_at(p, offset) };
@@ -1335,7 +1335,7 @@ pub unsafe extern "C" fn pbuf_get_at(p: *const Pbuf, offset: u16) -> u8 {
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_try_get_at(p: *const Pbuf, offset: u16) -> c_int {
     let mut q_idx: u16 = 0;
     // SAFETY: a well-formed chain, per the caller; the index is inside `q`'s payload.
@@ -1355,7 +1355,7 @@ pub unsafe extern "C" fn pbuf_try_get_at(p: *const Pbuf, offset: u16) -> c_int {
 /// # Safety
 ///
 /// See the module's safety section.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_put_at(p: *mut Pbuf, offset: u16, data: u8) {
     let mut q_idx: u16 = 0;
     // SAFETY: a well-formed chain, per the caller; the index is inside `q`'s payload.
@@ -1376,7 +1376,7 @@ pub unsafe extern "C" fn pbuf_put_at(p: *mut Pbuf, offset: u16, data: u8) {
 /// # Safety
 ///
 /// See the module's safety section; `p` is not null and `s2` is readable for `n` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_memcmp(
     p: *const Pbuf,
     offset: u16,
@@ -1423,7 +1423,7 @@ pub unsafe extern "C" fn pbuf_memcmp(
 ///
 /// See the module's safety section; `p` is not null and `mem` is readable for `mem_len`
 /// bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_memfind(
     p: *const Pbuf,
     mem: *const c_void,
@@ -1455,7 +1455,7 @@ pub unsafe extern "C" fn pbuf_memfind(
 ///
 /// See the module's safety section; `p` is not null and `substr` is null or a
 /// NUL-terminated string.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_strstr(p: *const Pbuf, substr: *const c_char) -> u16 {
     // SAFETY: forwarded from the caller; `substr` is only read once known non-null.
     unsafe {

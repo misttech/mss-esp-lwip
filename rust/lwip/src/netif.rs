@@ -56,11 +56,11 @@ use crate::sys::locked;
 use crate::types::*;
 
 /// The list of network interfaces.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static netif_list: Global<*mut Netif> = Global::new(ptr::null_mut());
 
 /// The default network interface.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static netif_default: Global<*mut Netif> = Global::new(ptr::null_mut());
 
 /// The number the next added netif gets, unless it is taken.
@@ -68,6 +68,13 @@ static NETIF_NUM: Global<u8> = Global::new(0);
 
 /// The loopback netif (`loop_netif`), zeroed as a C static is.
 static LOOP_NETIF: Global<MaybeUninit<Netif>> = Global::new(MaybeUninit::zeroed());
+
+/// The loopback netif, for lwIP's unit tests.
+#[cfg(lwip_testmode)]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
+pub extern "C" fn netif_get_loopif() -> *mut Netif {
+    LOOP_NETIF.as_ptr().cast()
+}
 
 /// The registered extended status callbacks.
 static EXT_CALLBACK: Global<*mut NetifExtCallback> = Global::new(ptr::null_mut());
@@ -142,7 +149,7 @@ unsafe extern "C" fn netif_loopif_init(netif: *mut Netif) -> ErrT {
 
 /// Initializes the network interface module: adds the loopback netif, 127.0.0.1 and ::1,
 /// and sets its link and itself up.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn netif_init() {
     let loop_gw = ip4(127, 0, 0, 1);
     let loop_ipaddr = ip4(127, 0, 0, 1);
@@ -184,7 +191,7 @@ pub extern "C" fn netif_init() {
 /// # Safety
 ///
 /// `p` and `inp` are live; the caller gives up `p`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_input(p: *mut Pbuf, inp: *mut Netif) -> ErrT {
     lwip_assert!("netif_input: invalid pbuf", !p.is_null());
     lwip_assert!("netif_input: invalid netif", !inp.is_null());
@@ -205,7 +212,7 @@ pub unsafe extern "C" fn netif_input(p: *mut Pbuf, inp: *mut Netif) -> ErrT {
 /// # Safety
 ///
 /// As `netif_add`'s.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_add_noaddr(
     netif: *mut Netif,
     state: *mut c_void,
@@ -238,7 +245,7 @@ pub unsafe extern "C" fn netif_add_noaddr(
 /// # Safety
 ///
 /// `netif` is writable and not on the list, the addresses null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_add(
     netif: *mut Netif,
     ipaddr: *const Ip4Addr,
@@ -432,7 +439,7 @@ unsafe fn netif_do_set_ipaddr(
 /// # Safety
 ///
 /// `netif` is null or live, and `ipaddr` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_set_ipaddr(netif: *mut Netif, ipaddr: *const Ip4Addr) {
     // LWIP_ERROR("netif_set_ipaddr: invalid netif", netif != NULL, return);
     if netif.is_null() {
@@ -487,7 +494,7 @@ unsafe fn netif_do_set_netmask(
 /// # Safety
 ///
 /// `netif` is null or live, and `netmask` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_set_netmask(netif: *mut Netif, netmask: *const Ip4Addr) {
     // LWIP_ERROR("netif_set_netmask: invalid netif", netif != NULL, return);
     if netif.is_null() {
@@ -536,7 +543,7 @@ unsafe fn netif_do_set_gw(netif: *mut Netif, gw: *const Ip4Addr, old_gw: *mut Ip
 /// # Safety
 ///
 /// `netif` is null or live, and `gw` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_set_gw(netif: *mut Netif, gw: *const Ip4Addr) {
     // LWIP_ERROR("netif_set_gw: invalid netif", netif != NULL, return);
     if netif.is_null() {
@@ -567,7 +574,7 @@ pub unsafe extern "C" fn netif_set_gw(netif: *mut Netif, gw: *const Ip4Addr) {
 /// # Safety
 ///
 /// `netif` is live, and the addresses null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_set_addr(
     netif: *mut Netif,
     ipaddr: *const Ip4Addr,
@@ -643,7 +650,7 @@ pub unsafe extern "C" fn netif_set_addr(
 /// # Safety
 ///
 /// `netif` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_remove(netif: *mut Netif) {
     if netif.is_null() {
         return;
@@ -701,7 +708,7 @@ pub unsafe extern "C" fn netif_remove(netif: *mut Netif) {
 
 /// Set a network interface as the default network interface (used to output all packets
 /// for which no specific route is found).
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn netif_set_default(netif: *mut Netif) {
     netif_default.set(netif);
 }
@@ -711,7 +718,7 @@ pub extern "C" fn netif_set_default(netif: *mut Netif) {
 /// # Safety
 ///
 /// `netif` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_set_up(netif: *mut Netif) {
     // LWIP_ERROR("netif_set_up: invalid netif", netif != NULL, return);
     if netif.is_null() {
@@ -767,7 +774,7 @@ unsafe fn netif_issue_reports(netif: *mut Netif, report_type: u8) {
 /// # Safety
 ///
 /// `netif` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_set_down(netif: *mut Netif) {
     // LWIP_ERROR("netif_set_down: invalid netif", netif != NULL, return);
     if netif.is_null() {
@@ -797,7 +804,7 @@ pub unsafe extern "C" fn netif_set_down(netif: *mut Netif) {
 /// # Safety
 ///
 /// `netif` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_set_link_up(netif: *mut Netif) {
     // LWIP_ERROR("netif_set_link_up: invalid netif", netif != NULL, return);
     if netif.is_null() {
@@ -826,7 +833,7 @@ pub unsafe extern "C" fn netif_set_link_up(netif: *mut Netif) {
 /// # Safety
 ///
 /// `netif` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_set_link_down(netif: *mut Netif) {
     // LWIP_ERROR("netif_set_link_down: invalid netif", netif != NULL, return);
     if netif.is_null() {
@@ -866,7 +873,7 @@ unsafe extern "C" fn netif_poll_callback(ctx: *mut c_void) {
 /// # Safety
 ///
 /// `netif` and `p` are live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_loop_output(netif: *mut Netif, p: *mut Pbuf) -> ErrT {
     let mut schedule_poll = false;
 
@@ -962,7 +969,7 @@ unsafe extern "C" fn netif_loop_output_ipv6(
 /// # Safety
 ///
 /// `netif` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_poll(netif: *mut Netif) {
     lwip_assert!("netif_poll: invalid netif", !netif.is_null());
 
@@ -1023,7 +1030,7 @@ pub unsafe extern "C" fn netif_poll(netif: *mut Netif) {
 /// # Safety
 ///
 /// `netif` is live and `addr6` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_ip6_addr_set(
     netif: *mut Netif,
     addr_idx: i8,
@@ -1044,7 +1051,7 @@ pub unsafe extern "C" fn netif_ip6_addr_set(
 /// # Safety
 ///
 /// `netif` is live and `addr_idx` an address index.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_ip6_addr_set_parts(
     netif: *mut Netif,
     addr_idx: i8,
@@ -1102,7 +1109,7 @@ pub unsafe extern "C" fn netif_ip6_addr_set_parts(
 /// # Safety
 ///
 /// `netif` is live and `addr_idx` an address index.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_ip6_addr_set_state(netif: *mut Netif, addr_idx: i8, state: u8) {
     lwip_assert!("netif != NULL", !netif.is_null());
     lwip_assert!(
@@ -1159,7 +1166,7 @@ pub unsafe extern "C" fn netif_ip6_addr_set_state(netif: *mut Netif, addr_idx: i
 /// # Safety
 ///
 /// `netif` is live and `ip6addr` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_get_ip6_addr_match(
     netif: *mut Netif,
     ip6addr: *const Ip6Addr,
@@ -1195,7 +1202,7 @@ pub unsafe extern "C" fn netif_get_ip6_addr_match(
 /// # Safety
 ///
 /// `netif` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_create_ip6_linklocal_address(netif: *mut Netif, from_mac_48bit: u8) {
     lwip_assert!(
         "netif_create_ip6_linklocal_address: invalid netif",
@@ -1265,7 +1272,7 @@ pub unsafe extern "C" fn netif_create_ip6_linklocal_address(netif: *mut Netif, f
 /// # Safety
 ///
 /// `netif` is live, `ip6addr` valid, and `chosen_idx` null or writable.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_add_ip6_address(
     netif: *mut Netif,
     ip6addr: *const Ip6Addr,
@@ -1332,7 +1339,7 @@ unsafe extern "C" fn netif_null_output_ip4(
 /// # Safety
 ///
 /// `name` is null or a NUL-terminated string.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_name_to_index(name: *const c_char) -> u8 {
     // SAFETY: forwarded from the caller.
     let netif = unsafe { netif_find(name) };
@@ -1350,7 +1357,7 @@ pub unsafe extern "C" fn netif_name_to_index(name: *const c_char) -> u8 {
 /// # Safety
 ///
 /// `name` is writable for `NETIF_NAMESIZE` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_index_to_name(idx: u8, name: *mut c_char) -> *mut c_char {
     let netif = netif_get_by_index(idx);
 
@@ -1371,7 +1378,7 @@ pub unsafe extern "C" fn netif_index_to_name(idx: u8, name: *mut c_char) -> *mut
 }
 
 /// Return the interface for the netif index.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn netif_get_by_index(idx: u8) -> *mut Netif {
     if idx != NETIF_NO_INDEX {
         let mut netif = netif_list.get();
@@ -1396,7 +1403,7 @@ pub extern "C" fn netif_get_by_index(idx: u8) -> *mut Netif {
 /// # Safety
 ///
 /// `name` is null or a NUL-terminated string.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_find(name: *const c_char) -> *mut Netif {
     if name.is_null() {
         return ptr::null_mut();
@@ -1428,7 +1435,7 @@ pub unsafe extern "C" fn netif_find(name: *const c_char) -> *mut Netif {
 /// # Safety
 ///
 /// `callback` is writable and stays live while registered.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_add_ext_callback(
     callback: *mut NetifExtCallback,
     fn_: NetifExtCallbackFn,
@@ -1449,7 +1456,7 @@ pub unsafe extern "C" fn netif_add_ext_callback(
 /// # Safety
 ///
 /// `callback` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_remove_ext_callback(callback: *mut NetifExtCallback) {
     lwip_assert!("callback must be != NULL", !callback.is_null());
 
@@ -1484,7 +1491,7 @@ pub unsafe extern "C" fn netif_remove_ext_callback(callback: *mut NetifExtCallba
 /// # Safety
 ///
 /// `netif` is live and `args` null or valid for the reason.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn netif_invoke_ext_callback(
     netif: *mut Netif,
     reason: NetifNscReason,

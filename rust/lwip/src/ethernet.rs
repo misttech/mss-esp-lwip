@@ -43,13 +43,13 @@ use crate::links::{
 use crate::types::*;
 
 /// The broadcast Ethernet address.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static ethbroadcast: EthAddr = EthAddr {
     addr: [0xff; ETH_HWADDR_LEN],
 };
 
 /// The all-zero Ethernet address.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static ethzero: EthAddr = EthAddr {
     addr: [0; ETH_HWADDR_LEN],
 };
@@ -64,7 +64,7 @@ pub static ethzero: EthAddr = EthAddr {
 ///
 /// `p` is a live pbuf chain whose first pbuf's payload is at least `len` bytes, and
 /// `netif` is a live netif; the caller gives up `p`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ethernet_input(p: *mut Pbuf, netif: *mut Netif) -> ErrT {
     let next_hdr_offset = SIZEOF_ETH_HDR;
 
@@ -163,7 +163,7 @@ pub unsafe extern "C" fn ethernet_input(p: *mut Pbuf, netif: *mut Netif) -> ErrT
 ///
 /// `netif` is a live netif with a `linkoutput`, `p` a live pbuf chain, and `src` and `dst`
 /// valid Ethernet addresses.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ethernet_output(
     netif: *mut Netif,
     p: *mut Pbuf,

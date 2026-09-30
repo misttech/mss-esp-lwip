@@ -110,7 +110,7 @@ static TCP_STATE_STR: [&core::ffi::CStr; 11] = [
 static TCP_PORT: Global<u16> = Global::new(TCP_LOCAL_PORT_RANGE_START);
 
 /// Incremented every coarse grained timer shot (typically every 500 ms).
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static tcp_ticks: Global<u32> = Global::new(0);
 
 static TCP_BACKOFF: [u8; 13] = [1, 2, 3, 4, 5, 6, 7, 7, 7, 7, 7, 7, 7];
@@ -120,17 +120,17 @@ static TCP_PERSIST_BACKOFF: [u8; 7] = [3, 6, 12, 24, 48, 96, 120];
 // The TCP PCB lists.
 
 /// List of all TCP PCBs bound but not yet (connected || listening).
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static tcp_bound_pcbs: Global<*mut TcpPcb> = Global::new(ptr::null_mut());
 /// List of all TCP PCBs in LISTEN state (`union tcp_listen_pcbs_t`: both members are the
 /// list's head).
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static tcp_listen_pcbs: Global<*mut TcpPcb> = Global::new(ptr::null_mut());
 /// List of all TCP PCBs that are in a state in which they accept or send data.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static tcp_active_pcbs: Global<*mut TcpPcb> = Global::new(ptr::null_mut());
 /// List of all TCP PCBs in TIME-WAIT state.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static tcp_tw_pcbs: Global<*mut TcpPcb> = Global::new(ptr::null_mut());
 
 /// `struct tcp_pcb **const tcp_pcb_lists[]`: the lists' heads.
@@ -142,7 +142,7 @@ pub struct TcpPcbLists(pub [*mut *mut TcpPcb; NUM_TCP_PCB_LISTS]);
 unsafe impl Sync for TcpPcbLists {}
 
 /// An array with all (non-temporary) PCB lists, mainly used for smaller code size.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static tcp_pcb_lists: TcpPcbLists = TcpPcbLists([
     tcp_listen_pcbs.as_ptr(),
     tcp_bound_pcbs.as_ptr(),
@@ -151,7 +151,7 @@ pub static tcp_pcb_lists: TcpPcbLists = TcpPcbLists([
 ]);
 
 /// Set when a callback may have changed the active list.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static tcp_active_pcbs_changed: Global<u8> = Global::new(0);
 
 /// Timer counter to handle calling slow-timer from tcp_tmr().
@@ -331,7 +331,7 @@ fn ip6_lacks_unicast_zone(addr: &Ip6Addr) -> bool {
 }
 
 /// Initialize this module.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_init() {
     // SAFETY: the port's random source takes nothing.
     TCP_PORT.set(tcp_ensure_local_port_range(unsafe { esp_random() }));
@@ -342,7 +342,7 @@ pub extern "C" fn tcp_init() {
 /// # Safety
 ///
 /// `pcb` is a live PCB from MEMP_TCP_PCB, not used afterwards.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_free(pcb: *mut TcpPcb) {
     // SAFETY: as the caller guarantees.
     unsafe {
@@ -366,7 +366,7 @@ unsafe fn tcp_free_listen(pcb: *mut TcpPcb) {
 }
 
 /// Called periodically to dispatch TCP timers.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_tmr() {
     // Call tcp_fasttmr() every 250 ms.
     tcp_fasttmr();
@@ -425,7 +425,7 @@ unsafe fn tcp_listen_closed(pcb: *mut TcpPcb) {
 /// # Safety
 ///
 /// `pcb` is a live connection PCB.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_backlog_delayed(pcb: *mut TcpPcb) {
     lwip_assert!("pcb != NULL", !pcb.is_null());
     // SAFETY: as the caller guarantees; its listener is live.
@@ -448,7 +448,7 @@ pub unsafe extern "C" fn tcp_backlog_delayed(pcb: *mut TcpPcb) {
 /// # Safety
 ///
 /// `pcb` is a live connection PCB.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_backlog_accepted(pcb: *mut TcpPcb) {
     lwip_assert!("pcb != NULL", !pcb.is_null());
     // SAFETY: as the caller guarantees; its listener is live.
@@ -621,7 +621,7 @@ unsafe fn tcp_close_shutdown_fin(pcb: *mut TcpPcb) -> ErrT {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_close(pcb: *mut TcpPcb) -> ErrT {
     // SAFETY: forwarded from the caller.
     unsafe { tcp_close_ext(pcb, 1) }
@@ -632,7 +632,7 @@ pub unsafe extern "C" fn tcp_close(pcb: *mut TcpPcb) -> ErrT {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_close_ext(pcb: *mut TcpPcb, rst_on_unacked_data: u8) -> ErrT {
     // LWIP_ERROR("tcp_close: invalid pcb", pcb != NULL, return ERR_ARG);
     if pcb.is_null() {
@@ -657,7 +657,7 @@ pub unsafe extern "C" fn tcp_close_ext(pcb: *mut TcpPcb, rst_on_unacked_data: u8
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_shutdown(pcb: *mut TcpPcb, shut_rx: c_int, shut_tx: c_int) -> ErrT {
     // LWIP_ERROR("tcp_shutdown: invalid pcb", pcb != NULL, return ERR_ARG);
     if pcb.is_null() {
@@ -704,7 +704,7 @@ pub unsafe extern "C" fn tcp_shutdown(pcb: *mut TcpPcb, shut_rx: c_int, shut_tx:
 /// # Safety
 ///
 /// `pcb` is null or live, and not used afterwards.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_abandon(pcb: *mut TcpPcb, reset: c_int) {
     // LWIP_ERROR("tcp_abandon: invalid pcb", pcb != NULL, return);
     if pcb.is_null() {
@@ -778,7 +778,7 @@ pub unsafe extern "C" fn tcp_abandon(pcb: *mut TcpPcb, reset: c_int) {
 /// # Safety
 ///
 /// `pcb` is null or live, and not used afterwards.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_abort(pcb: *mut TcpPcb) {
     // SAFETY: forwarded from the caller.
     unsafe { tcp_abandon(pcb, 1) };
@@ -792,7 +792,7 @@ pub unsafe extern "C" fn tcp_abort(pcb: *mut TcpPcb) {
 /// # Safety
 ///
 /// `pcb` is null or live, and `ipaddr` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_bind(pcb: *mut TcpPcb, ipaddr: *const IpAddr, mut port: u16) -> ErrT {
     // Don't propagate NULL pointer (IPv4 ANY) to subsequent functions.
     let mut ipaddr = if ipaddr.is_null() {
@@ -886,7 +886,7 @@ pub unsafe extern "C" fn tcp_bind(pcb: *mut TcpPcb, ipaddr: *const IpAddr, mut p
 /// # Safety
 ///
 /// `pcb` is live and `netif` null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_bind_netif(pcb: *mut TcpPcb, netif: *const Netif) {
     // SAFETY: as the caller guarantees.
     unsafe {
@@ -918,7 +918,7 @@ unsafe extern "C" fn tcp_accept_null(_arg: *mut c_void, pcb: *mut TcpPcb, _err: 
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_listen_with_backlog(pcb: *mut TcpPcb, backlog: u8) -> *mut TcpPcb {
     // SAFETY: forwarded from the caller.
     unsafe { tcp_listen_with_backlog_and_err(pcb, backlog, ptr::null_mut()) }
@@ -934,7 +934,7 @@ pub unsafe extern "C" fn tcp_listen_with_backlog(pcb: *mut TcpPcb, backlog: u8) 
 /// # Safety
 ///
 /// `pcb` is null or live, and `err` null or writable.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_listen_with_backlog_and_err(
     pcb: *mut TcpPcb,
     backlog: u8,
@@ -1020,7 +1020,7 @@ pub unsafe extern "C" fn tcp_listen_with_backlog_and_err(
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_update_rcv_ann_wnd(pcb: *mut TcpPcb) -> u32 {
     lwip_assert!("tcp_update_rcv_ann_wnd: invalid pcb", !pcb.is_null());
     // SAFETY: as the caller guarantees.
@@ -1058,7 +1058,7 @@ pub unsafe extern "C" fn tcp_update_rcv_ann_wnd(pcb: *mut TcpPcb) -> u32 {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_recved(pcb: *mut TcpPcb, len: u16) {
     // LWIP_ERROR("tcp_recved: invalid pcb", pcb != NULL, return);
     if pcb.is_null() {
@@ -1143,7 +1143,7 @@ fn tcp_new_port() -> u16 {
 /// # Safety
 ///
 /// `pcb` is null or live, and `ipaddr` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_connect(
     pcb: *mut TcpPcb,
     ipaddr: *const IpAddr,
@@ -1265,7 +1265,7 @@ pub unsafe extern "C" fn tcp_connect(
 /// timers such as the inactivity timer in each PCB.
 ///
 /// Automatically called from `tcp_tmr()`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_slowtmr() {
     let mut err = ERR_OK;
 
@@ -1563,7 +1563,7 @@ pub extern "C" fn tcp_slowtmr() {
 /// upper layer (application) and sends delayed ACKs or pending FINs.
 ///
 /// Automatically called from `tcp_tmr()`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_fasttmr() {
     TCP_TIMER_CTR.set(TCP_TIMER_CTR.get().wrapping_add(1));
 
@@ -1611,7 +1611,7 @@ pub extern "C" fn tcp_fasttmr() {
 }
 
 /// Call `tcp_output` for all active pcbs that have TF_NAGLEMEMERR set.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_txnow() {
     let mut pcb = tcp_active_pcbs.get();
     while !pcb.is_null() {
@@ -1630,7 +1630,7 @@ pub extern "C" fn tcp_txnow() {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_process_refused_data(pcb: *mut TcpPcb) -> ErrT {
     // LWIP_ERROR("tcp_process_refused_data: invalid pcb", pcb != NULL, return ERR_ARG);
     if pcb.is_null() {
@@ -1707,7 +1707,7 @@ pub(crate) unsafe fn tcp_event_closed(pcb: *mut TcpPcb) -> ErrT {
 /// # Safety
 ///
 /// `seg` is null or a list of live segments, not used afterwards.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_segs_free(mut seg: *mut TcpSeg) {
     while !seg.is_null() {
         // SAFETY: as the caller guarantees.
@@ -1724,7 +1724,7 @@ pub unsafe extern "C" fn tcp_segs_free(mut seg: *mut TcpSeg) {
 /// # Safety
 ///
 /// `seg` is null or a live segment, not used afterwards.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_seg_free(seg: *mut TcpSeg) {
     if !seg.is_null() {
         // SAFETY: as the caller guarantees.
@@ -1742,7 +1742,7 @@ pub unsafe extern "C" fn tcp_seg_free(seg: *mut TcpSeg) {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_setprio(pcb: *mut TcpPcb, prio: u8) {
     // LWIP_ERROR("tcp_setprio: invalid pcb", pcb != NULL, return);
     if !pcb.is_null() {
@@ -1757,7 +1757,7 @@ pub unsafe extern "C" fn tcp_setprio(pcb: *mut TcpPcb, prio: u8) {
 /// # Safety
 ///
 /// `seg` is a live segment.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_seg_copy(seg: *mut TcpSeg) -> *mut TcpSeg {
     lwip_assert!("tcp_seg_copy: invalid seg", !seg.is_null());
 
@@ -1779,7 +1779,7 @@ pub unsafe extern "C" fn tcp_seg_copy(seg: *mut TcpSeg) -> *mut TcpSeg {
 /// # Safety
 ///
 /// `pcb` is null or live, and `p` null or a pbuf this takes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_recv_null(
     _arg: *mut c_void,
     pcb: *mut TcpPcb,
@@ -1909,10 +1909,21 @@ fn tcp_handle_closepend() {
     }
 }
 
+/// `if (pcb != NULL) MEMP_STATS_DEC(err, MEMP_TCP_PCB)`: once a retry in `tcp_alloc`
+/// succeeds, each failed attempt before it is taken back from the pool's error count.
+fn memp_stats_dec_err_if(pcb: *mut TcpPcb) {
+    #[cfg(memp_stats)]
+    if !pcb.is_null() {
+        // SAFETY: MEMP_TCP_PCB is a pool, and lwIP is initialized before any PCB is made.
+        unsafe { crate::memp::memp_stats_dec_err(config::MEMP_TCP_PCB) };
+    }
+    let _ = pcb;
+}
+
 /// Allocate a new tcp_pcb structure.
 ///
 /// Returns a new tcp_pcb that initially is in state CLOSED.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_alloc(prio: u8) -> *mut TcpPcb {
     // SAFETY: a MEMP_TCP_PCB element holds a struct tcp_pcb, zeroed before use.
     unsafe {
@@ -1947,11 +1958,20 @@ pub extern "C" fn tcp_alloc(prio: u8) -> *mut TcpPcb {
                                 // priority than the new one.
                                 tcp_kill_prio(prio);
                                 pcb = memp_malloc(config::MEMP_TCP_PCB).cast();
+                                // Adjust err stats: memp_malloc failed multiple times
+                                // before.
+                                memp_stats_dec_err_if(pcb);
                             }
+                            memp_stats_dec_err_if(pcb);
                         }
+                        memp_stats_dec_err_if(pcb);
                     }
+                    memp_stats_dec_err_if(pcb);
                 }
+                memp_stats_dec_err_if(pcb);
             }
+            // Adjust err stats: memp_malloc failed above.
+            memp_stats_dec_err_if(pcb);
         }
         if !pcb.is_null() {
             // Zero out the whole pcb, so there is no need to initialize members to zero.
@@ -1998,7 +2018,7 @@ pub extern "C" fn tcp_alloc(prio: u8) -> *mut TcpPcb {
 /// Creates a new TCP protocol control block but doesn't place it on any of the TCP PCB
 /// lists. The pcb is not put on any list until binding using `tcp_bind()`. If memory is
 /// not available for creating the new pcb, NULL is returned.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_new() -> *mut TcpPcb {
     tcp_alloc(TCP_PRIO_NORMAL)
 }
@@ -2006,7 +2026,7 @@ pub extern "C" fn tcp_new() -> *mut TcpPcb {
 /// Creates a new TCP protocol control block but doesn't place it on any of the TCP PCB
 /// lists, for the given IP type (`IPADDR_TYPE_V4`, `IPADDR_TYPE_V6`, or
 /// `IPADDR_TYPE_ANY`).
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_new_ip_type(type_: u8) -> *mut TcpPcb {
     let pcb = tcp_alloc(TCP_PRIO_NORMAL);
     if !pcb.is_null() {
@@ -2026,7 +2046,7 @@ pub extern "C" fn tcp_new_ip_type(type_: u8) -> *mut TcpPcb {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_arg(pcb: *mut TcpPcb, arg: *mut c_void) {
     // This function is allowed to be called for both listen pcbs and connection pcbs.
     if !pcb.is_null() {
@@ -2043,7 +2063,7 @@ pub unsafe extern "C" fn tcp_arg(pcb: *mut TcpPcb, arg: *mut c_void) {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_recv(pcb: *mut TcpPcb, recv: TcpRecvFn) {
     if !pcb.is_null() {
         // SAFETY: as the caller guarantees.
@@ -2063,7 +2083,7 @@ pub unsafe extern "C" fn tcp_recv(pcb: *mut TcpPcb, recv: TcpRecvFn) {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_sent(pcb: *mut TcpPcb, sent: TcpSentFn) {
     if !pcb.is_null() {
         // SAFETY: as the caller guarantees.
@@ -2088,7 +2108,7 @@ pub unsafe extern "C" fn tcp_sent(pcb: *mut TcpPcb, sent: TcpSentFn) {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_err(pcb: *mut TcpPcb, err: TcpErrFn) {
     if !pcb.is_null() {
         // SAFETY: as the caller guarantees.
@@ -2108,7 +2128,7 @@ pub unsafe extern "C" fn tcp_err(pcb: *mut TcpPcb, err: TcpErrFn) {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_accept(pcb: *mut TcpPcb, accept: TcpAcceptFn) {
     // SAFETY: as the caller guarantees; a LISTEN PCB is a struct tcp_pcb_listen.
     unsafe {
@@ -2127,7 +2147,7 @@ pub unsafe extern "C" fn tcp_accept(pcb: *mut TcpPcb, accept: TcpAcceptFn) {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_poll(pcb: *mut TcpPcb, poll: TcpPollFn, interval: u8) {
     // LWIP_ERROR("tcp_poll: invalid pcb", pcb != NULL, return);
     if pcb.is_null() {
@@ -2148,7 +2168,7 @@ pub unsafe extern "C" fn tcp_poll(pcb: *mut TcpPcb, poll: TcpPollFn, interval: u
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_pcb_purge(pcb: *mut TcpPcb) {
     // LWIP_ERROR("tcp_pcb_purge: invalid pcb", pcb != NULL, return);
     if pcb.is_null() {
@@ -2186,7 +2206,7 @@ pub unsafe extern "C" fn tcp_pcb_purge(pcb: *mut TcpPcb) {
 /// # Safety
 ///
 /// `pcblist` is a list head and `pcb` a live PCB.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_pcb_remove(pcblist: *mut *mut TcpPcb, pcb: *mut TcpPcb) {
     lwip_assert!("tcp_pcb_remove: invalid pcb", !pcb.is_null());
     lwip_assert!("tcp_pcb_remove: invalid pcblist", !pcblist.is_null());
@@ -2221,7 +2241,7 @@ pub unsafe extern "C" fn tcp_pcb_remove(pcblist: *mut *mut TcpPcb, pcb: *mut Tcp
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_next_iss(pcb: *mut TcpPcb) -> u32 {
     lwip_assert!("tcp_next_iss: invalid pcb", !pcb.is_null());
     // SAFETY: as the caller guarantees.
@@ -2242,7 +2262,7 @@ pub unsafe extern "C" fn tcp_next_iss(pcb: *mut TcpPcb) -> u32 {
 /// # Safety
 ///
 /// `outif` is null or live, and `dest` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_eff_send_mss_netif(
     mut sendmss: u16,
     outif: *mut Netif,
@@ -2311,7 +2331,7 @@ unsafe fn tcp_netif_ip_addr_changed_pcblist(old_addr: *const IpAddr, pcb_list: *
 /// # Safety
 ///
 /// `old_addr` is valid, and `new_addr` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_netif_ip_addr_changed(
     old_addr: *const IpAddr,
     new_addr: *const IpAddr,
@@ -2340,7 +2360,7 @@ pub unsafe extern "C" fn tcp_netif_ip_addr_changed(
 }
 
 /// The name of a TCP state, for debug output.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn tcp_debug_state_str(s: TcpState) -> *const c_char {
     TCP_STATE_STR[s as usize].as_ptr()
 }
@@ -2350,7 +2370,7 @@ pub extern "C" fn tcp_debug_state_str(s: TcpState) -> *const c_char {
 /// # Safety
 ///
 /// `pcb` is null or live, and `addr` and `port` null or writable.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_tcp_get_tcp_addrinfo(
     pcb: *mut TcpPcb,
     local: c_int,
@@ -2382,7 +2402,7 @@ pub unsafe extern "C" fn tcp_tcp_get_tcp_addrinfo(
 /// # Safety
 ///
 /// `pcb` is live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn tcp_free_ooseq(pcb: *mut TcpPcb) {
     // SAFETY: as the caller guarantees.
     unsafe {
