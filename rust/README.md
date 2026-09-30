@@ -13,7 +13,7 @@ Ethernet frame) is identical.
 | `cmake/` | `lwip_rust_apply()`, which swaps modules into a CMake lwIP target, and the configuration probe |
 | `esp-idf/lwip/` | ESP-IDF's `lwip` component, built from this tree with Rust modules |
 | `third_party/fp/` | Zero-dependency `no_std` building blocks (`static_assert!`) |
-| `third_party/libc/` | Forkpoint's C library, which the Rust modules take everything they need from a C library from |
+| `third_party/rivet/` | Rivet's C library, which the Rust modules take everything they need from a C library from |
 | `test/unit/` | lwIP's own unit tests, run against the Rust modules |
 
 See `PORTING.md` for how a module is ported and `UNSAFE.md` for the `unsafe`

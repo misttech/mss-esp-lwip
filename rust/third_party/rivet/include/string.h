@@ -1,6 +1,6 @@
 // Copyright 2026 Mist Tecnologia LTDA. All rights reserved.
 
-/* The string functions of the Forkpoint freestanding C library, src/lib/libc. */
+/* The string functions of rivet, a freestanding C library, src/lib/libc. */
 
 #ifndef STRING_H
 #define STRING_H

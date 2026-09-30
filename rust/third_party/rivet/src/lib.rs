@@ -1,6 +1,6 @@
 // Copyright 2026 Mist Tecnologia LTDA. All rights reserved.
 
-//! A minimal freestanding C library for firmware run under Forkpoint.
+//! Rivet: a minimal freestanding C library for embedded firmware.
 //!
 //! It provides what LVGL, the lwIP Rust port, and compiler-generated code call:
 //! the `string.h` and `ctype.h` functions, `putchar`, `abort`, `atoi`, and the `assert`

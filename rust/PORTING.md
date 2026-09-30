@@ -22,8 +22,9 @@ Ports follow Forkpoint's C-to-Rust rubric. In short:
    `// SAFETY:` comment and every `unsafe fn` a `# Safety` section. Update
    `UNSAFE.md`.
 6. **The C library.** Anything a module needs from a C library comes from
-   `third_party/libc`. Add what is missing to Forkpoint's `src/lib/libc` first,
-   then copy it here.
+   `third_party/rivet`, a copy of rivet's C library. Add what is missing to
+   rivet (https://github.com/misttech/rivet) first, with its tests, then copy
+   it here.
 7. **Documentation.** Keep the C file's comments that document behavior, and its
    license header.
 8. **Wiring.** Add the module's feature to `lwip/Cargo.toml` and its C file to

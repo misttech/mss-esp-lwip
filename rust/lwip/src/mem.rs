@@ -36,7 +36,7 @@
 //! overflow and sanity checks, and ESP-IDF's SPIRAM-first allocation). With `MEM_STATS`,
 //! each block carries its size in a header, as `mem.c` stores it, for `lwip_stats.mem`.
 //!
-//! The allocator is the firmware's, as it is for the C stack: forkpoint-libc leaves
+//! The allocator is the firmware's, as it is for the C stack: rivet-libc leaves
 //! allocation to the platform, and ESP-IDF's heap serves both.
 //!
 //! The types and alignment helpers are always built; the functions only with the `mem`

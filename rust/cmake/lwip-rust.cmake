@@ -116,7 +116,7 @@ function(lwip_rust_apply target)
     set(archive "${out}/target/${LWIP_RUST_TARGET}/release/liblwip.a")
     file(GLOB_RECURSE crate_sources CONFIGURE_DEPENDS
         "${root}/lwip/src/*.rs" "${root}/third_party/fp/src/*.rs"
-        "${root}/third_party/libc/src/*.rs")
+        "${root}/third_party/rivet/src/*.rs")
     add_custom_command(
         OUTPUT "${object}"
         COMMAND ${CMAKE_COMMAND} -E env

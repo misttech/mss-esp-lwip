@@ -15,7 +15,7 @@ path = "src/lib.rs"
 
 [dependencies]
 fp = { path = "../third_party/fp" }
-forkpoint-libc = { path = "../third_party/libc" }
+rivet-libc = { path = "../third_party/rivet" }
 
 # One feature per ported C file, named after it. The firmware build turns on the ones in
 # LWIP_RUST_MODULES and drops those C files.
