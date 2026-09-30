@@ -925,6 +925,255 @@ pub struct Dhcp {
     pub acd: Acd,
 }
 
+/// `tcpwnd_size_t`: 16 bits, without window scaling.
+pub type TcpWnd = u16;
+/// `tcpflags_t`.
+pub type TcpFlags = u16;
+/// `enum tcp_state`.
+pub type TcpState = core::ffi::c_uint;
+pub const CLOSED: TcpState = 0;
+pub const LISTEN: TcpState = 1;
+pub const SYN_SENT: TcpState = 2;
+pub const SYN_RCVD: TcpState = 3;
+pub const ESTABLISHED: TcpState = 4;
+pub const FIN_WAIT_1: TcpState = 5;
+pub const FIN_WAIT_2: TcpState = 6;
+pub const CLOSE_WAIT: TcpState = 7;
+pub const CLOSING: TcpState = 8;
+pub const LAST_ACK: TcpState = 9;
+pub const TIME_WAIT: TcpState = 10;
+
+/// `tcp_accept_fn`.
+pub type TcpAcceptFn =
+    Option<unsafe extern "C" fn(arg: *mut c_void, newpcb: *mut TcpPcb, err: ErrT) -> ErrT>;
+/// `tcp_recv_fn`.
+pub type TcpRecvFn = Option<
+    unsafe extern "C" fn(arg: *mut c_void, tpcb: *mut TcpPcb, p: *mut Pbuf, err: ErrT) -> ErrT,
+>;
+/// `tcp_sent_fn`.
+pub type TcpSentFn =
+    Option<unsafe extern "C" fn(arg: *mut c_void, tpcb: *mut TcpPcb, len: u16) -> ErrT>;
+/// `tcp_poll_fn`.
+pub type TcpPollFn = Option<unsafe extern "C" fn(arg: *mut c_void, tpcb: *mut TcpPcb) -> ErrT>;
+/// `tcp_err_fn`.
+pub type TcpErrFn = Option<unsafe extern "C" fn(arg: *mut c_void, err: ErrT)>;
+/// `tcp_connected_fn`.
+pub type TcpConnectedFn =
+    Option<unsafe extern "C" fn(arg: *mut c_void, tpcb: *mut TcpPcb, err: ErrT) -> ErrT>;
+
+/// `struct tcp_pcb_listen`: a listening PCB, the prefix it shares with `struct tcp_pcb`
+/// and its accept callback.
+#[repr(C)]
+pub struct TcpPcbListen {
+    pub local_ip: IpAddr,
+    pub remote_ip: IpAddr,
+    pub netif_idx: u8,
+    pub so_options: u8,
+    pub tos: u8,
+    pub ttl: u8,
+    pub next: *mut TcpPcbListen,
+    pub callback_arg: *mut c_void,
+    pub state: TcpState,
+    pub prio: u8,
+    pub local_port: u16,
+    /// Function to call when a listener has been connected.
+    pub accept: TcpAcceptFn,
+    pub backlog: u8,
+    pub accepts_pending: u8,
+}
+
+/// `struct tcp_pcb`: the TCP protocol control block, which C (api_msg.c, the port) reads
+/// and writes.
+#[repr(C)]
+pub struct TcpPcb {
+    pub local_ip: IpAddr,
+    pub remote_ip: IpAddr,
+    pub netif_idx: u8,
+    pub so_options: u8,
+    pub tos: u8,
+    pub ttl: u8,
+    pub next: *mut TcpPcb,
+    pub callback_arg: *mut c_void,
+    pub state: TcpState,
+    pub prio: u8,
+    pub local_port: u16,
+    pub remote_port: u16,
+    pub flags: TcpFlags,
+    pub polltmr: u8,
+    pub pollinterval: u8,
+    pub last_timer: u8,
+    pub tmr: u32,
+    // Receiver variables.
+    /// Next seqno expected.
+    pub rcv_nxt: u32,
+    /// Receiver window available.
+    pub rcv_wnd: TcpWnd,
+    /// Receiver window to announce.
+    pub rcv_ann_wnd: TcpWnd,
+    /// Announced right edge of window.
+    pub rcv_ann_right_edge: u32,
+    /// Retransmission timer.
+    pub rtime: i16,
+    /// Maximum segment size.
+    pub mss: u16,
+    // RTT (round trip time) estimation variables.
+    /// RTT estimate in 500ms ticks.
+    pub rttest: u32,
+    /// Sequence number being timed.
+    pub rtseq: u32,
+    /// `@see "Congestion Avoidance and Control" by Van Jacobson and Karels`.
+    pub sa: i16,
+    pub sv: i16,
+    /// Retransmission time-out (in ticks of TCP_SLOW_INTERVAL).
+    pub rto: i16,
+    /// Number of retransmissions.
+    pub nrtx: u8,
+    // Fast retransmit/recovery.
+    pub dupacks: u8,
+    /// Highest acknowledged seqno.
+    pub lastack: u32,
+    // Congestion avoidance/control variables.
+    pub cwnd: TcpWnd,
+    pub ssthresh: TcpWnd,
+    /// First byte following last rto byte.
+    pub rto_end: u32,
+    // Sender variables.
+    /// Next new seqno to be sent.
+    pub snd_nxt: u32,
+    /// Sequence and acknowledgement numbers of last window update.
+    pub snd_wl1: u32,
+    pub snd_wl2: u32,
+    /// Sequence number of next byte to be buffered.
+    pub snd_lbb: u32,
+    /// Sender window.
+    pub snd_wnd: TcpWnd,
+    /// The maximum sender window announced by the remote host.
+    pub snd_wnd_max: TcpWnd,
+    /// Available buffer space for sending (in bytes).
+    pub snd_buf: TcpWnd,
+    /// Number of pbufs currently in the send buffer.
+    pub snd_queuelen: u16,
+    /// Extra bytes available at the end of the last pbuf in unsent.
+    pub unsent_oversize: u16,
+    pub bytes_acked: TcpWnd,
+    // These are ordered by sequence number.
+    /// Unsent (queued) segments.
+    pub unsent: *mut TcpSeg,
+    /// Sent but unacknowledged segments.
+    pub unacked: *mut TcpSeg,
+    /// Received out of sequence segments.
+    pub ooseq: *mut TcpSeg,
+    /// Data previously received but not yet taken by upper layer.
+    pub refused_data: *mut Pbuf,
+    pub listener: *mut TcpPcbListen,
+    /// Function to be called when more send buffer space is available.
+    pub sent: TcpSentFn,
+    /// Function to be called when (in-sequence) data has arrived.
+    pub recv: TcpRecvFn,
+    /// Function to be called when a connection has been set up.
+    pub connected: TcpConnectedFn,
+    /// Function which is called periodically.
+    pub poll: TcpPollFn,
+    /// Function to be called whenever a fatal error occurs.
+    pub errf: TcpErrFn,
+    // Idle time before KEEPALIVE is sent, and its interval and count.
+    pub keep_idle: u32,
+    pub keep_intvl: u32,
+    pub keep_cnt: u32,
+    // Persist timer counter, backoff, and number of probes.
+    pub persist_cnt: u8,
+    pub persist_backoff: u8,
+    pub persist_probe: u8,
+    /// KEEPALIVE counter.
+    pub keep_cnt_sent: u8,
+}
+
+/// `struct tcp_hdr`, as it is on the wire.
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct TcpHdr {
+    pub src: u16,
+    pub dest: u16,
+    pub seqno: u32,
+    pub ackno: u32,
+    pub _hdrlen_rsvd_flags: u16,
+    pub wnd: u16,
+    pub chksum: u16,
+    pub urgp: u16,
+}
+
+/// `struct tcp_seg`: a TCP segment on a PCB's queues.
+#[repr(C)]
+pub struct TcpSeg {
+    pub next: *mut TcpSeg,
+    /// Buffer containing data + TCP header.
+    pub p: *mut Pbuf,
+    /// The TCP length of this segment.
+    pub len: u16,
+    /// `TF_SEG_*`.
+    pub flags: u8,
+    /// The TCP header.
+    pub tcphdr: *mut TcpHdr,
+}
+
+/// `TCP_HLEN`.
+pub const TCP_HLEN: u16 = 20;
+
+// TCP header flags.
+pub const TCP_FIN: u8 = 0x01;
+pub const TCP_SYN: u8 = 0x02;
+pub const TCP_RST: u8 = 0x04;
+pub const TCP_PSH: u8 = 0x08;
+pub const TCP_ACK: u8 = 0x10;
+pub const TCP_URG: u8 = 0x20;
+pub const TCP_ECE: u8 = 0x40;
+pub const TCP_CWR: u8 = 0x80;
+/// `TCP_FLAGS`: valid flags in the header.
+pub const TCP_FLAGS: u8 = 0x3f;
+
+// `struct tcp_pcb` flags (`tcpflags_t`).
+/// Delayed ACK.
+pub const TF_ACK_DELAY: TcpFlags = 0x01;
+/// Immediate ACK.
+pub const TF_ACK_NOW: TcpFlags = 0x02;
+/// In fast recovery.
+pub const TF_INFR: TcpFlags = 0x04;
+/// If this is set, tcp_close failed to enqueue the FIN (retried in tcp_tmr).
+pub const TF_CLOSEPEND: TcpFlags = 0x08;
+/// rx closed by tcp_shutdown.
+pub const TF_RXCLOSED: TcpFlags = 0x10;
+/// Connection was closed locally (FIN segment enqueued).
+pub const TF_FIN: TcpFlags = 0x20;
+/// Disable Nagle algorithm.
+pub const TF_NODELAY: TcpFlags = 0x40;
+/// nagle enabled, memerr, try to output to prevent delayed ACK to happen.
+pub const TF_NAGLEMEMERR: TcpFlags = 0x80;
+/// The connection's accept is pending on the listener's backlog.
+pub const TF_BACKLOGPEND: TcpFlags = 0x0200;
+/// RTO timer has fired, in-flight data moved to unsent and being retransmitted.
+pub const TF_RTO: TcpFlags = 0x0800;
+
+/// `TF_SEG_OPTS_MSS`: include MSS option (only used in SYN segments).
+pub const TF_SEG_OPTS_MSS: u8 = 0x01;
+
+/// `TCP_WRITE_FLAG_COPY`: data will be copied into memory belonging to the stack.
+pub const TCP_WRITE_FLAG_COPY: u8 = 0x01;
+/// `TCP_WRITE_FLAG_MORE`: PSH flag is not set on last segment sent.
+pub const TCP_WRITE_FLAG_MORE: u8 = 0x02;
+
+/// `ERR_CONN`: not connected.
+pub const ERR_CONN: ErrT = -11;
+/// `ERR_ABRT`: connection aborted.
+pub const ERR_ABRT: ErrT = -13;
+/// `ERR_RST`: connection reset.
+pub const ERR_RST: ErrT = -14;
+/// `ERR_CLSD`: connection closed.
+pub const ERR_CLSD: ErrT = -15;
+/// `ERR_ISCONN`: already connected.
+pub const ERR_ISCONN: ErrT = -10;
+/// `ERR_ALREADY`: already connecting.
+pub const ERR_ALREADY: ErrT = -9;
+
 /// `sys_timeout_handler`: a function `sys_timeout` calls with its argument.
 pub type SysTimeoutHandler = Option<unsafe extern "C" fn(arg: *mut c_void)>;
 
@@ -1157,6 +1406,29 @@ mod layout {
     fp::static_assert!(offset_of!(UdpPcb, mcast_ttl) == UDP_PCB_MCAST_TTL);
     fp::static_assert!(offset_of!(UdpPcb, recv) == UDP_PCB_RECV);
     fp::static_assert!(offset_of!(UdpPcb, recv_arg) == UDP_PCB_RECV_ARG);
+    fp::static_assert!(size_of::<TcpWnd>() == SIZEOF_TCPWND_SIZE_T);
+    fp::static_assert!(size_of::<TcpPcb>() == SIZEOF_TCP_PCB);
+    fp::static_assert!(offset_of!(TcpPcb, next) == TCP_PCB_NEXT);
+    fp::static_assert!(offset_of!(TcpPcb, state) == TCP_PCB_STATE);
+    fp::static_assert!(offset_of!(TcpPcb, flags) == TCP_PCB_FLAGS);
+    fp::static_assert!(offset_of!(TcpPcb, tmr) == TCP_PCB_TMR);
+    fp::static_assert!(offset_of!(TcpPcb, rcv_ann_right_edge) == TCP_PCB_RCV_ANN_RIGHT_EDGE);
+    fp::static_assert!(offset_of!(TcpPcb, rttest) == TCP_PCB_RTTEST);
+    fp::static_assert!(offset_of!(TcpPcb, lastack) == TCP_PCB_LASTACK);
+    fp::static_assert!(offset_of!(TcpPcb, snd_nxt) == TCP_PCB_SND_NXT);
+    fp::static_assert!(offset_of!(TcpPcb, snd_buf) == TCP_PCB_SND_BUF);
+    fp::static_assert!(offset_of!(TcpPcb, bytes_acked) == TCP_PCB_BYTES_ACKED);
+    fp::static_assert!(offset_of!(TcpPcb, ooseq) == TCP_PCB_OOSEQ);
+    fp::static_assert!(offset_of!(TcpPcb, listener) == TCP_PCB_LISTENER);
+    fp::static_assert!(offset_of!(TcpPcb, errf) == TCP_PCB_ERRF);
+    fp::static_assert!(offset_of!(TcpPcb, keep_idle) == TCP_PCB_KEEP_IDLE);
+    fp::static_assert!(offset_of!(TcpPcb, keep_cnt_sent) == TCP_PCB_KEEP_CNT_SENT);
+    fp::static_assert!(size_of::<TcpPcbListen>() == SIZEOF_TCP_PCB_LISTEN);
+    fp::static_assert!(offset_of!(TcpPcbListen, accept) == TCP_PCB_LISTEN_ACCEPT);
+    fp::static_assert!(offset_of!(TcpPcbListen, accepts_pending) == TCP_PCB_LISTEN_ACCEPTS_PENDING);
+    fp::static_assert!(size_of::<TcpSeg>() == SIZEOF_TCP_SEG);
+    fp::static_assert!(offset_of!(TcpSeg, tcphdr) == TCP_SEG_TCPHDR);
+    fp::static_assert!(size_of::<TcpHdr>() == SIZEOF_TCP_HDR);
     fp::static_assert!(size_of::<DhcpTimeout>() == SIZEOF_DHCP_TIMEOUT_T);
     fp::static_assert!(size_of::<Dhcp>() == SIZEOF_STRUCT_DHCP);
     fp::static_assert!(offset_of!(Dhcp, request_timeout) == DHCP_REQUEST_TIMEOUT);

@@ -119,6 +119,18 @@ const SWITCHES: &[(&str, u64)] = &[
     ("LWIP_DHCP_DISCOVER_ADD_HOSTNAME", 1),
     ("LWIP_DHCP_AUTOIP_COOP", 0),
     ("DHCP_DEFINE_CUSTOM_TIMEOUTS", 1),
+    ("LWIP_TCP_TIMESTAMPS", 0),
+    ("LWIP_WND_SCALE", 0),
+    ("LWIP_TCP_SACK_OUT", 0),
+    ("TCP_CHECKSUM_ON_COPY", 0),
+    ("CHECKSUM_GEN_TCP", 1),
+    ("CHECKSUM_CHECK_TCP", 1),
+    ("TCP_OVERSIZE_DBGCHECK", 0),
+    ("LWIP_TCP_KEEPALIVE", 1),
+    ("TCP_QUEUE_OOSEQ", 1),
+    ("LWIP_TCP_PCB_NUM_EXT_ARGS", 0),
+    ("LWIP_CALLBACK_API", 1),
+    ("LWIP_EVENT_API", 0),
 ];
 
 /// Values. ESP-IDF v6.1 defaults.
@@ -181,6 +193,14 @@ const VALUES: &[(&str, u64)] = &[
     ("DHCP_BACKOFF_255", 4000),
     ("DHCP_HOOKS", 0),
     ("DHCP_ESP_OPTION_HOOKS", 1),
+    ("TCP_MSS", 1440),
+    ("TCP_SND_BUF", 5760),
+    ("TCP_WND", 5760),
+    ("TCP_SND_QUEUELEN", 16),
+    ("TCP_SNDQUEUELEN_OVERFLOW", 0xfffc),
+    ("TCP_TTL", 64),
+    ("TCP_OVERSIZE", 1440),
+    ("TCP_HOOKS", 0),
     // Read only when a tcp_pcb exists; host tests have none.
     ("TCP_PCB_NEXT", 0),
     ("TCP_PCB_OOSEQ", 0),
@@ -221,8 +241,8 @@ fn main() {
         .chain(VALUES)
         .map(|&(name, value)| (name.to_string(), value))
         .collect();
-    // A host's struct pbuf and struct udp_pcb are wider than the target's: size their
-    // pools for them.
+    // A host's struct pbuf and the PCBs and segments are wider than the target's: size
+    // their pools for them.
     let pointer =
         env::var("CARGO_CFG_TARGET_POINTER_WIDTH").map_or(4, |w| w.parse::<u64>().unwrap() / 8);
     let host_pbuf = (2 * pointer + 8).next_multiple_of(pointer);
@@ -235,6 +255,8 @@ fn main() {
                 "PBUF_POOL" => host_pbuf + 1516,
                 // Three pointers: next, recv, and recv_arg.
                 "UDP_PCB" => (size + 3 * (pointer - 4)).next_multiple_of(pointer),
+                // Wider pointers at most double a struct.
+                "TCP_PCB" | "TCP_PCB_LISTEN" | "TCP_SEG" => size * pointer / 4,
                 _ => size,
             };
             (name.to_string(), index as u64, size)
@@ -498,6 +520,38 @@ fn main() {
             ("LWIP_NETIF_USE_HINTS", 0),
         ],
     );
+    // tcp.rs, tcp_in.rs, and tcp_out.rs translate the files as ESP-IDF configures them.
+    let tcp_common = [
+        ("LWIP_IPV4", 1),
+        ("LWIP_IPV6", 1),
+        ("LWIP_IPV6_SCOPES", 1),
+        ("LWIP_TCP", 1),
+        ("LWIP_TCP_TIMESTAMPS", 0),
+        ("LWIP_WND_SCALE", 0),
+        ("LWIP_TCP_SACK_OUT", 0),
+        ("TCP_CHECKSUM_ON_COPY", 0),
+        ("LWIP_CHECKSUM_ON_COPY", 0),
+        ("CHECKSUM_GEN_TCP", 1),
+        ("CHECKSUM_CHECK_TCP", 1),
+        ("LWIP_CHECKSUM_CTRL_PER_NETIF", 0),
+        ("TCP_OVERSIZE_DBGCHECK", 0),
+        ("LWIP_TCP_KEEPALIVE", 1),
+        ("TCP_QUEUE_OOSEQ", 1),
+        ("LWIP_TCP_PCB_NUM_EXT_ARGS", 0),
+        ("LWIP_CALLBACK_API", 1),
+        ("LWIP_EVENT_API", 0),
+        ("LWIP_NETIF_TX_SINGLE_PBUF", 1),
+        ("TCP_HOOKS", 0),
+        ("ESP_LWIP", 1),
+    ];
+    requires("tcp_out", &tcp_common);
+    if env::var_os("CARGO_FEATURE_TCP_OUT").is_some() {
+        assert_eq!(
+            value("TCP_OVERSIZE"),
+            value("TCP_MSS"),
+            "tcp_out: only TCP_OVERSIZE == TCP_MSS is ported"
+        );
+    }
     // dhcp.rs translates dhcp.c as ESP-IDF configures it: the back-off it computes is
     // ESP-IDF's DHCP_REQUEST_BACKOFF_SEQUENCE, checked at a few points.
     requires(

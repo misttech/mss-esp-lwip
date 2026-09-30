@@ -255,3 +255,62 @@ extern "C" fn dhcp_append_extra_opts(
     _options_out_len: *mut u16,
 ) {
 }
+
+/// tcp.c's `tcp_ticks` and tcp_in.c's `tcp_input_pcb`, until they are ported.
+#[unsafe(no_mangle)]
+pub(crate) static mut tcp_ticks: u32 = 0;
+#[unsafe(no_mangle)]
+pub(crate) static mut tcp_input_pcb: *mut crate::types::TcpPcb = core::ptr::null_mut();
+
+/// tcp.c's `tcp_eff_send_mss_netif`: the MSS the netif's MTU allows for IPv4.
+#[unsafe(no_mangle)]
+extern "C" fn tcp_eff_send_mss_netif(sendmss: u16, outif: *mut Netif, _dest: *const IpAddr) -> u16 {
+    // SAFETY: tcp_out.c passes the netif it routes through, or null.
+    let mtu = unsafe { outif.as_ref() }.map_or(0, |n| n.mtu);
+    if mtu == 0 {
+        sendmss
+    } else {
+        sendmss.min(mtu - 40)
+    }
+}
+
+/// tcp.c's `tcp_seg_free` and `tcp_segs_free`.
+#[unsafe(no_mangle)]
+extern "C" fn tcp_seg_free(seg: *mut crate::types::TcpSeg) {
+    if !seg.is_null() {
+        // SAFETY: a segment from memp with its pbuf.
+        unsafe {
+            if !(*seg).p.is_null() {
+                crate::links::pbuf_free((*seg).p);
+            }
+            crate::links::memp_free(crate::config::MEMP_TCP_SEG, seg.cast());
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn tcp_segs_free(mut seg: *mut crate::types::TcpSeg) {
+    while !seg.is_null() {
+        // SAFETY: a list of live segments.
+        let next = unsafe { (*seg).next };
+        tcp_seg_free(seg);
+        seg = next;
+    }
+}
+
+/// Packets the IPv6 output stand-in `ip6_output_if` was handed.
+pub(crate) static IP6_IF_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
+
+#[unsafe(no_mangle)]
+extern "C" fn ip6_output_if(
+    _p: *mut Pbuf,
+    _src: *const c_void,
+    _dest: *const c_void,
+    _hl: u8,
+    _tc: u8,
+    _nexth: u8,
+    _netif: *mut Netif,
+) -> ErrT {
+    IP6_IF_OUTPUTS.fetch_add(1, Relaxed);
+    0
+}
