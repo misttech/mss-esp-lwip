@@ -106,7 +106,7 @@ unsafe fn is_routable(netif: *const Netif) -> bool {
 }
 
 /// Set a default netif for IPv4 multicast.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn ip4_set_default_multicast_netif(default_multicast_netif: *mut Netif) {
     IP4_DEFAULT_MULTICAST_NETIF.set(default_multicast_netif);
 }
@@ -117,7 +117,7 @@ pub extern "C" fn ip4_set_default_multicast_netif(default_multicast_netif: *mut 
 /// # Safety
 ///
 /// `src` is null or valid, and `dest` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4_route_src(src: *const Ip4Addr, dest: *const Ip4Addr) -> *mut Netif {
     // SAFETY: forwarded from the caller.
     unsafe {
@@ -141,7 +141,7 @@ pub unsafe extern "C" fn ip4_route_src(src: *const Ip4Addr, dest: *const Ip4Addr
 /// # Safety
 ///
 /// `dest` is valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4_route(dest: *const Ip4Addr) -> *mut Netif {
     // SAFETY: as the caller guarantees; netifs on the list are live.
     unsafe {
@@ -226,7 +226,7 @@ unsafe fn ip4_input_accept(netif: *mut Netif) -> bool {
 ///
 /// `p` is a live pbuf chain holding an IPv4 packet and `inp` a live netif; the caller
 /// gives up `p`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4_input(p: *mut Pbuf, inp: *mut Netif) -> ErrT {
     let mut check_ip_src = true;
 
@@ -399,7 +399,7 @@ pub unsafe extern "C" fn ip4_input(p: *mut Pbuf, inp: *mut Netif) -> ErrT {
 /// # Safety
 ///
 /// See `ip4_output_if_opt_src`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4_output_if(
     p: *mut Pbuf,
     src: *const Ip4Addr,
@@ -418,7 +418,7 @@ pub unsafe extern "C" fn ip4_output_if(
 /// # Safety
 ///
 /// See `ip4_output_if_opt_src`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn ip4_output_if_opt(
     p: *mut Pbuf,
@@ -449,7 +449,7 @@ pub unsafe extern "C" fn ip4_output_if_opt(
 /// # Safety
 ///
 /// See `ip4_output_if_opt_src`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4_output_if_src(
     p: *mut Pbuf,
     src: *const Ip4Addr,
@@ -471,7 +471,7 @@ pub unsafe extern "C" fn ip4_output_if_src(
 /// `p` is a live pbuf chain with a single reference, `netif` a live netif with an
 /// `output`, `src` null or valid, `dest` null (the header is included) or valid, and
 /// `ip_options` readable for `optlen` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn ip4_output_if_opt_src(
     p: *mut Pbuf,
@@ -611,7 +611,7 @@ pub unsafe extern "C" fn ip4_output_if_opt_src(
 /// # Safety
 ///
 /// See `ip4_output_if_opt_src`; `dest` is valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4_output(
     p: *mut Pbuf,
     src: *const Ip4Addr,

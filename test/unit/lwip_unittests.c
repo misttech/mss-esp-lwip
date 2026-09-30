@@ -24,6 +24,7 @@
 #include "ppp/test_pppos.h"
 
 #include "lwip/init.h"
+#include "lwip/priv/memp_priv.h"
 #if !NO_SYS
 #include "lwip/tcpip.h"
 #endif
@@ -73,8 +74,17 @@ void lwip_check_ensure_no_alloc(unsigned int skip)
   unsigned int mask;
 
   if (!(skip & SKIP_HEAP)) {
-    fail_unless(lwip_stats.mem.used == 0,
-      "mem heap still has %d bytes allocated", lwip_stats.mem.used);
+    mem_size_t used = lwip_stats.mem.used;
+#if MEMP_MEM_MALLOC
+    /* Pool elements come from the heap: leave out those of the skipped pools. */
+    for (i = 0, mask = 1; i < MEMP_MAX; i++, mask <<= 1) {
+      if (skip & mask) {
+        used -= lwip_stats.memp[i]->used * (MEMP_SIZE + MEMP_ALIGN_SIZE(memp_pools[i]->size));
+      }
+    }
+#endif /* MEMP_MEM_MALLOC */
+    fail_unless(used == 0,
+      "mem heap still has %d bytes allocated", used);
   }
   for (i = 0, mask = 1; i < MEMP_MAX; i++, mask <<= 1) {
     if (!(skip & mask)) {

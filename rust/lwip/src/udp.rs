@@ -58,7 +58,7 @@ use crate::types::*;
 static UDP_PORT: Global<u16> = Global::new(config::UDP_LOCAL_PORT_RANGE_START_ as u16);
 
 /// The list of UDP PCBs.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static udp_pcbs: Global<*mut UdpPcb> = Global::new(ptr::null_mut());
 
 const START: u16 = config::UDP_LOCAL_PORT_RANGE_START_ as u16;
@@ -77,7 +77,7 @@ const ICMP6_DUR_PORT: core::ffi::c_uint = 4;
 const PBUF_FLAG_MCASTLOOP: u8 = 0x04;
 
 /// Initialize this module.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn udp_init() {
     // SAFETY: the port's random source takes nothing.
     UDP_PORT.set(ensure_local_port_range(unsafe { esp_random() }));
@@ -207,7 +207,7 @@ unsafe fn udp_input_local_match(pcb: *mut UdpPcb, inp: *mut Netif, broadcast: bo
 ///
 /// `p` is a live pbuf chain at the UDP header, `inp` the live netif it arrived on, and
 /// `ip_data` describes the packet; the caller gives up `p`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_input(p: *mut Pbuf, inp: *mut Netif) {
     lwip_assert!("udp_input: invalid pbuf", !p.is_null());
     lwip_assert!("udp_input: invalid netif", !inp.is_null());
@@ -377,7 +377,7 @@ pub unsafe extern "C" fn udp_input(p: *mut Pbuf, inp: *mut Netif) {
 /// # Safety
 ///
 /// `pcb` is null or live, and `p` null or a live pbuf chain.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_send(pcb: *mut UdpPcb, p: *mut Pbuf) -> ErrT {
     if pcb.is_null() || p.is_null() {
         return ERR_ARG;
@@ -400,7 +400,7 @@ pub unsafe extern "C" fn udp_send(pcb: *mut UdpPcb, p: *mut Pbuf) -> ErrT {
 /// # Safety
 ///
 /// `pcb` null or live, `p` null or a live pbuf chain, and `dst_ip` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_sendto(
     pcb: *mut UdpPcb,
     p: *mut Pbuf,
@@ -480,7 +480,7 @@ pub unsafe extern "C" fn udp_sendto(
 ///
 /// `pcb` null or live, `p` null or a live pbuf chain, `dst_ip` null or valid, and
 /// `netif` null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_sendto_if(
     pcb: *mut UdpPcb,
     p: *mut Pbuf,
@@ -545,7 +545,7 @@ pub unsafe extern "C" fn udp_sendto_if(
 ///
 /// `pcb` null or live, `p` null or a live pbuf chain, `dst_ip` and `src_ip` null or
 /// valid, and `netif` null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_sendto_if_src(
     pcb: *mut UdpPcb,
     p: *mut Pbuf,
@@ -660,7 +660,7 @@ pub unsafe extern "C" fn udp_sendto_if_src(
 /// # Safety
 ///
 /// `pcb` null or live, and `ipaddr` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_bind(pcb: *mut UdpPcb, ipaddr: *const IpAddr, port: u16) -> ErrT {
     let mut ipaddr = if ipaddr.is_null() {
         ip_addr_any()
@@ -750,7 +750,7 @@ pub unsafe extern "C" fn udp_bind(pcb: *mut UdpPcb, ipaddr: *const IpAddr, port:
 /// # Safety
 ///
 /// `pcb` is live and `netif` null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_bind_netif(pcb: *mut UdpPcb, netif: *const Netif) {
     // SAFETY: as the caller guarantees.
     unsafe {
@@ -768,7 +768,7 @@ pub unsafe extern "C" fn udp_bind_netif(pcb: *mut UdpPcb, netif: *const Netif) {
 /// # Safety
 ///
 /// `pcb` null or live, and `ipaddr` null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_connect(pcb: *mut UdpPcb, ipaddr: *const IpAddr, port: u16) -> ErrT {
     if pcb.is_null() || ipaddr.is_null() {
         return ERR_ARG;
@@ -816,7 +816,7 @@ pub unsafe extern "C" fn udp_connect(pcb: *mut UdpPcb, ipaddr: *const IpAddr, po
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_disconnect(pcb: *mut UdpPcb) {
     if pcb.is_null() {
         return;
@@ -844,7 +844,7 @@ pub unsafe extern "C" fn udp_disconnect(pcb: *mut UdpPcb) {
 /// # Safety
 ///
 /// `pcb` is null or live.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_recv(pcb: *mut UdpPcb, recv: UdpRecvFn, recv_arg: *mut c_void) {
     if pcb.is_null() {
         return;
@@ -862,7 +862,7 @@ pub unsafe extern "C" fn udp_recv(pcb: *mut UdpPcb, recv: UdpRecvFn, recv_arg: *
 /// # Safety
 ///
 /// `pcb` is null or a live PCB from `udp_new`, not used afterwards.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_remove(pcb: *mut UdpPcb) {
     if pcb.is_null() {
         return;
@@ -895,7 +895,7 @@ pub unsafe extern "C" fn udp_remove(pcb: *mut UdpPcb) {
 ///
 /// Returns the UDP PCB which was created, or null if the PCB data structure could not be
 /// allocated.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn udp_new() -> *mut UdpPcb {
     // SAFETY: a MEMP_UDP_PCB element holds a struct udp_pcb, zeroed before use.
     unsafe {
@@ -917,7 +917,7 @@ pub extern "C" fn udp_new() -> *mut UdpPcb {
 /// Create a UDP PCB for specific IP type.
 ///
 /// `type_` is one of `IPADDR_TYPE_*`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn udp_new_ip_type(type_: u8) -> *mut UdpPcb {
     let pcb = udp_new();
     if !pcb.is_null() {
@@ -935,7 +935,7 @@ pub extern "C" fn udp_new_ip_type(type_: u8) -> *mut UdpPcb {
 /// # Safety
 ///
 /// `old_addr` and `new_addr` are null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn udp_netif_ip_addr_changed(
     old_addr: *const IpAddr,
     new_addr: *const IpAddr,

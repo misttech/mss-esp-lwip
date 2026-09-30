@@ -194,7 +194,7 @@ fn etharp_free_entry(i: usize) {
 ///
 /// This function should be called every `ARP_TMR_INTERVAL` milliseconds (1 second), in
 /// order to expire entries in the ARP table.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn etharp_tmr() {
     // Remove expired entries from the ARP table.
     for i in 0..ARP_TABLE_SIZE {
@@ -468,7 +468,7 @@ unsafe fn etharp_update_arp_entry(
 /// # Safety
 ///
 /// `ipaddr` and `ethaddr` are valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_add_static_entry(
     ipaddr: *const Ip4Addr,
     ethaddr: *mut EthAddr,
@@ -497,7 +497,7 @@ pub unsafe extern "C" fn etharp_add_static_entry(
 /// # Safety
 ///
 /// `ipaddr` is valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_remove_static_entry(ipaddr: *const Ip4Addr) -> ErrT {
     // Find or create ARP entry.
     // SAFETY: valid, per the caller.
@@ -517,7 +517,7 @@ pub unsafe extern "C" fn etharp_remove_static_entry(ipaddr: *const Ip4Addr) -> E
 }
 
 /// Remove all ARP table entries of the specified netif.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn etharp_cleanup_netif(netif: *mut Netif) {
     for i in 0..ARP_TABLE_SIZE {
         // SAFETY: a table index.
@@ -536,7 +536,7 @@ pub extern "C" fn etharp_cleanup_netif(netif: *mut Netif) {
 /// # Safety
 ///
 /// `ipaddr` is valid, and `eth_ret` and `ip_ret` are writable.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_find_addr(
     netif: *mut Netif,
     ipaddr: *const Ip4Addr,
@@ -567,7 +567,7 @@ pub unsafe extern "C" fn etharp_find_addr(
 /// # Safety
 ///
 /// `ipaddr`, `netif`, and `eth_ret` are writable.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_get_entry(
     i: usize,
     ipaddr: *mut *mut Ip4Addr,
@@ -602,7 +602,7 @@ pub unsafe extern "C" fn etharp_get_entry(
 ///
 /// `p` is a live pbuf whose payload holds an ARP message and `netif` is null or live; the
 /// caller gives up `p`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_input(p: *mut Pbuf, netif: *mut Netif) {
     // LWIP_ERROR("netif != NULL", (netif != NULL), return;)
     if netif.is_null() {
@@ -765,7 +765,7 @@ unsafe fn etharp_output_to_arp_index(netif: *mut Netif, q: *mut Pbuf, arp_idx: u
 /// # Safety
 ///
 /// `netif` and `q` are live and `ipaddr` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_output(
     netif: *mut Netif,
     q: *mut Pbuf,
@@ -874,7 +874,7 @@ pub unsafe extern "C" fn etharp_output(
 /// # Safety
 ///
 /// `netif` is live, `ipaddr` valid, and `q` null or a live pbuf chain.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_query(
     netif: *mut Netif,
     ipaddr: *const Ip4Addr,
@@ -1124,7 +1124,7 @@ unsafe fn etharp_request_dst(
 /// # Safety
 ///
 /// `netif` is live and `ipaddr` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_request(netif: *mut Netif, ipaddr: *const Ip4Addr) -> ErrT {
     // SAFETY: forwarded from the caller.
     unsafe { etharp_request_dst(netif, ipaddr, ethbroadcast()) }
@@ -1136,7 +1136,7 @@ pub unsafe extern "C" fn etharp_request(netif: *mut Netif, ipaddr: *const Ip4Add
 /// # Safety
 ///
 /// `netif` is live and `ipaddr` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_acd_probe(netif: *mut Netif, ipaddr: *const Ip4Addr) -> ErrT {
     // SAFETY: as the caller guarantees.
     unsafe {
@@ -1161,7 +1161,7 @@ pub unsafe extern "C" fn etharp_acd_probe(netif: *mut Netif, ipaddr: *const Ip4A
 /// # Safety
 ///
 /// `netif` is live and `ipaddr` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn etharp_acd_announce(netif: *mut Netif, ipaddr: *const Ip4Addr) -> ErrT {
     // SAFETY: as the caller guarantees.
     unsafe {

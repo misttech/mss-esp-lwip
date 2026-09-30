@@ -48,6 +48,7 @@ mod global;
 mod links;
 pub mod mem;
 pub mod memp;
+pub mod stats;
 mod sys;
 #[cfg(test)]
 mod test_support;

@@ -4,8 +4,8 @@
 #include "lwip/stats.h"
 #include "tcp_helper.h"
 
-#if !LWIP_STATS || !TCP_STATS || !MEMP_STATS
-#error "This tests needs TCP- and MEMP-statistics enabled"
+#if !LWIP_STATS || !MEMP_STATS
+#error "This tests needs MEMP-statistics enabled"
 #endif
 #if !TCP_QUEUE_OOSEQ
 #error "This tests needs TCP_QUEUE_OOSEQ enabled"

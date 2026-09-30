@@ -52,7 +52,7 @@ use crate::types::*;
 ///
 /// `p` is a live pbuf chain starting with an IPv4 header, `netif` a live netif with an
 /// `output`, and `dest` valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4_frag(p: *mut Pbuf, netif: *mut Netif, dest: *const Ip4Addr) -> ErrT {
     // SAFETY: as the caller guarantees; each fragment is a fresh pbuf in one piece.
     unsafe {

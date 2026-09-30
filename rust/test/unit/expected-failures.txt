@@ -1,0 +1,20 @@
+# Copyright 2026 Mist Tecnologia LTDA. All rights reserved.
+
+# lwIP's unit tests that fail under lwipopts.h here in the all-C build, and so must also
+# fail, the same way, with the Rust modules. Each expects an option ESP-IDF sets
+# otherwise. One test per line: SUITE:test, then why.
+
+IPv4:test_127_0_0_1                      LWIP_HOOK_IP4_ROUTE_SRC routes by the source address, out the test netif
+UDP:test_udp_broadcast_rx_with_2_netifs  SO_REUSE_RXTOALL delivers the broadcast to the wildcard PCB too
+TCP:test_tcp_retx_add_to_sent            LWIP_NETIF_TX_SINGLE_PBUF sends the retransmission and new data apart
+MEM:test_mem_one                         MEM_LIBC_MALLOC and MEMP_MEM_MALLOC: the tests are for lwIP's own heap
+MEM:test_mem_random                      MEM_LIBC_MALLOC and MEMP_MEM_MALLOC: the tests are for lwIP's own heap
+MEM:test_mem_invalid_free                MEM_LIBC_MALLOC and MEMP_MEM_MALLOC: the tests are for lwIP's own heap
+MEM:test_mem_double_free                 MEM_LIBC_MALLOC and MEMP_MEM_MALLOC: the tests are for lwIP's own heap
+TIMERS:test_cyclic_timers                MEMP_MEM_MALLOC: timeouts the test replaces leak from the heap
+DHCP:test_options                        ESP-IDF does not define DHCP_ADD_EXTRA_REQUEST_OPTIONS
+SOCKETS:test_sockets_basics              MEMP_MEM_MALLOC: the test's sys_arch frees a mailbox still in use
+SOCKETS:test_sockets_allfunctions_basic  MEMP_MEM_MALLOC: the test's sys_arch frees a mailbox still in use
+SOCKETS:test_sockets_msgapis             MEMP_MEM_MALLOC: the test's sys_arch frees a mailbox still in use
+SOCKETS:test_sockets_select              MEMP_MEM_MALLOC: the test's sys_arch frees a mailbox still in use
+SOCKETS:test_sockets_recv_after_rst      MEMP_MEM_MALLOC: the test's sys_arch frees a mailbox still in use

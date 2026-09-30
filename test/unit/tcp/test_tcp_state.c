@@ -9,8 +9,8 @@
 #pragma warning(disable: 4307) /* we explicitly wrap around TCP seqnos */
 #endif
 
-#if !LWIP_STATS || !TCP_STATS || !MEMP_STATS
-#error "This tests needs TCP- and MEMP-statistics enabled"
+#if !LWIP_STATS || !MEMP_STATS
+#error "This tests needs MEMP-statistics enabled"
 #endif
 
 static struct netif test_netif = {0};

@@ -111,7 +111,7 @@ pub fn standard_chksum(data: &[u8]) -> u16 {
 ///
 /// `dataptr` is readable for `len` bytes.
 #[cfg(lwip_standard_chksum)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn lwip_standard_chksum(dataptr: *const core::ffi::c_void, len: i32) -> u16 {
     // SAFETY: forwarded from the caller.
     standard_chksum(unsafe { bytes(dataptr, usize::try_from(len).unwrap_or(0)) })
@@ -211,7 +211,7 @@ fn ip6_pseudo_acc(src: &Ip6Addr, dest: &Ip6Addr) -> u32 {
 ///
 /// `p` is null or a well-formed pbuf chain; `src` and `dest` are valid.
 #[cfg(lwip_ipv4)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn inet_chksum_pseudo(
     p: *mut Pbuf,
     proto: u8,
@@ -232,7 +232,7 @@ pub unsafe extern "C" fn inet_chksum_pseudo(
 ///
 /// `p` is null or a well-formed pbuf chain; `src` and `dest` are valid.
 #[cfg(lwip_ipv6)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip6_chksum_pseudo(
     p: *mut Pbuf,
     proto: u8,
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn ip6_chksum_pseudo(
 ///
 /// `p` is null or a well-formed pbuf chain; `src` and `dest` are valid.
 #[cfg(any(lwip_ipv4, lwip_ipv6))]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip_chksum_pseudo(
     p: *mut Pbuf,
     proto: u8,
@@ -333,7 +333,7 @@ unsafe fn inet_cksum_pseudo_partial_base(
 ///
 /// `p` is null or a well-formed pbuf chain; `src` and `dest` are valid.
 #[cfg(lwip_ipv4)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn inet_chksum_pseudo_partial(
     p: *mut Pbuf,
     proto: u8,
@@ -356,7 +356,7 @@ pub unsafe extern "C" fn inet_chksum_pseudo_partial(
 ///
 /// `p` is null or a well-formed pbuf chain; `src` and `dest` are valid.
 #[cfg(lwip_ipv6)]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip6_chksum_pseudo_partial(
     p: *mut Pbuf,
     proto: u8,
@@ -378,7 +378,7 @@ pub unsafe extern "C" fn ip6_chksum_pseudo_partial(
 ///
 /// `p` is null or a well-formed pbuf chain; `src` and `dest` are valid.
 #[cfg(any(lwip_ipv4, lwip_ipv6))]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip_chksum_pseudo_partial(
     p: *mut Pbuf,
     proto: u8,
@@ -411,7 +411,7 @@ pub unsafe extern "C" fn ip_chksum_pseudo_partial(
 /// # Safety
 ///
 /// `dataptr` is readable for `len` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn inet_chksum(dataptr: *const core::ffi::c_void, len: u16) -> u16 {
     // SAFETY: forwarded from the caller.
     !standard_chksum(unsafe { bytes(dataptr, usize::from(len)) })
@@ -423,7 +423,7 @@ pub unsafe extern "C" fn inet_chksum(dataptr: *const core::ffi::c_void, len: u16
 /// # Safety
 ///
 /// `p` is null or a well-formed pbuf chain.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn inet_chksum_pbuf(p: *mut Pbuf) -> u16 {
     let mut acc: u32 = 0;
     let mut swapped = false;

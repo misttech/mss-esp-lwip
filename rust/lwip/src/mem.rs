@@ -33,7 +33,8 @@
 //! Dynamic memory manager, from `src/core/mem.c`, for `MEM_LIBC_MALLOC`: lwIP's heap is
 //! the C library's `malloc`, `calloc`, and `free`. That is the configuration ESP-IDF uses
 //! and the only one ported; `build.rs` refuses the others (lwIP's own heap, `MEM_USE_POOLS`,
-//! overflow and sanity checks, statistics, and ESP-IDF's SPIRAM-first allocation).
+//! overflow and sanity checks, and ESP-IDF's SPIRAM-first allocation). With `MEM_STATS`,
+//! each block carries its size in a header, as `mem.c` stores it, for `lwip_stats.mem`.
 //!
 //! The allocator is the firmware's, as it is for the C stack: forkpoint-libc leaves
 //! allocation to the platform, and ESP-IDF's heap serves both.
@@ -54,6 +55,15 @@ pub const fn mem_align_size(size: usize) -> usize {
     size.wrapping_add(config::MEM_ALIGNMENT - 1) & !(config::MEM_ALIGNMENT - 1)
 }
 
+/// `MEM_LIBC_STATSHELPER_SIZE`: the header in which each block records its size for the
+/// statistics.
+#[cfg(feature = "mem")]
+const MEM_LIBC_STATSHELPER_SIZE: usize = if cfg!(mem_stats) {
+    mem_align_size(size_of::<MemSize>())
+} else {
+    0
+};
+
 /// `LWIP_MEM_ALIGN(addr)`: `addr` rounded up to `MEM_ALIGNMENT`.
 pub fn mem_align<T>(addr: *mut T) -> *mut T {
     addr.map_addr(mem_align_size)
@@ -63,7 +73,8 @@ pub fn mem_align<T>(addr: *mut T) -> *mut T {
 unsafe extern "C" {
     /// `mem_clib_malloc`: the firmware's allocator.
     fn malloc(size: usize) -> *mut c_void;
-    /// `mem_clib_calloc`.
+    /// `mem_clib_calloc`, unless statistics count the block through `mem_malloc`.
+    #[cfg(not(mem_stats))]
     fn calloc(count: usize, size: usize) -> *mut c_void;
     /// `mem_clib_free`.
     fn free(ptr: *mut c_void);
@@ -71,13 +82,13 @@ unsafe extern "C" {
 
 /// Zero. With `MEM_LIBC_MALLOC`, there is no heap to initialize.
 #[cfg(feature = "mem")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn mem_init() {}
 
 /// Shrink memory returned by `mem_malloc()`. The C library's heap is not trimmed: `mem`
 /// itself is returned.
 #[cfg(feature = "mem")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn mem_trim(mem: *mut c_void, size: MemSize) -> *mut c_void {
     let _ = size;
     mem
@@ -91,19 +102,33 @@ pub extern "C" fn mem_trim(mem: *mut c_void, size: MemSize) -> *mut c_void {
 ///
 /// None beyond the C library's `malloc`.
 #[cfg(feature = "mem")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn mem_malloc(size: MemSize) -> *mut c_void {
-    // MEM_LIBC_STATSHELPER_SIZE is 0 without statistics.
     // SAFETY: `malloc` takes any size.
-    let ret = unsafe { malloc(size) };
+    let ret = unsafe { malloc(size.wrapping_add(MEM_LIBC_STATSHELPER_SIZE)) };
     if ret.is_null() {
-        // MEM_STATS_INC_LOCKED(err): the critical section is entered even though there is
-        // no statistic to count.
-        crate::sys::locked(|| {});
+        // MEM_STATS_INC_LOCKED(err): without statistics the critical section is entered
+        // with nothing to count.
+        crate::sys::locked(|| {
+            #[cfg(mem_stats)]
+            // SAFETY: `lwip_stats.mem` is only written inside the critical section.
+            unsafe {
+                let stats = crate::stats::mem();
+                (*stats).err = (*stats).err.wrapping_add(1);
+            }
+        });
+        ret
     } else {
         lwip_assert!("malloc() must return aligned memory", mem_align(ret) == ret);
+        #[cfg(mem_stats)]
+        // SAFETY: the block starts with room for its size, which stays aligned.
+        let ret = unsafe {
+            ret.cast::<MemSize>().write(size);
+            crate::sys::locked(|| (*crate::stats::mem()).inc_used(size));
+            ret.byte_add(MEM_LIBC_STATSHELPER_SIZE)
+        };
+        ret
     }
-    ret
 }
 
 /// Put memory back on the heap.
@@ -112,10 +137,21 @@ pub unsafe extern "C" fn mem_malloc(size: MemSize) -> *mut c_void {
 ///
 /// `rmem` was returned by `mem_malloc` or `mem_calloc` and not freed since.
 #[cfg(feature = "mem")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn mem_free(rmem: *mut c_void) {
     lwip_assert!("rmem != NULL", !rmem.is_null());
     lwip_assert!("rmem == MEM_ALIGN(rmem)", rmem == mem_align(rmem));
+    #[cfg(mem_stats)]
+    // SAFETY: `mem_malloc` put the block's size just before `rmem`.
+    let rmem = unsafe {
+        let rmem = rmem.byte_sub(MEM_LIBC_STATSHELPER_SIZE);
+        let size = rmem.cast::<MemSize>().read();
+        crate::sys::locked(|| {
+            let stats = crate::stats::mem();
+            (*stats).used = (*stats).used.wrapping_sub(size);
+        });
+        rmem
+    };
     // SAFETY: `rmem` came from the C library's heap, per the caller.
     unsafe { free(rmem) };
 }
@@ -127,10 +163,25 @@ pub unsafe extern "C" fn mem_free(rmem: *mut c_void) {
 ///
 /// None beyond the C library's `calloc`.
 #[cfg(feature = "mem")]
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn mem_calloc(count: MemSize, size: MemSize) -> *mut c_void {
+    #[cfg(not(mem_stats))]
     // SAFETY: `calloc` takes any count and size.
-    unsafe { calloc(count, size) }
+    let p = unsafe { calloc(count, size) };
+    // With statistics the block comes from mem_malloc, which counts it. The product wraps
+    // as C's unsigned arithmetic does; mem_size_t is size_t, so it always fits.
+    #[cfg(mem_stats)]
+    let p = {
+        let alloc_size = count.wrapping_mul(size);
+        // SAFETY: `mem_malloc` takes any size.
+        let p = unsafe { mem_malloc(alloc_size) };
+        if !p.is_null() {
+            // SAFETY: the block holds `alloc_size` bytes.
+            unsafe { p.cast::<u8>().write_bytes(0, alloc_size) };
+        }
+        p
+    };
+    p
 }
 
 #[cfg(all(test, feature = "mem"))]

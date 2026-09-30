@@ -15,8 +15,8 @@
 
 #include "lwip/tcpip.h"
 
-#if !LWIP_IPV4 || !IP_REASSEMBLY || !MIB2_STATS || !IPFRAG_STATS
-#error "This tests needs LWIP_IPV4, IP_REASSEMBLY; MIB2- and IPFRAG-statistics enabled"
+#if !LWIP_IPV4
+#error "This tests needs LWIP_IPV4"
 #endif
 
 #if !LWIP_NETIF_EXT_STATUS_CALLBACK
