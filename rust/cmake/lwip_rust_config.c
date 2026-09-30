@@ -52,6 +52,9 @@
 #include "lwip/prot/udp.h"
 #include "lwip/priv/raw_priv.h"
 #include "lwip/prot/dns.h"
+#include "lwip/dhcp.h"
+#include "lwip/prot/dhcp.h"
+#include "lwip/acd.h"
 
 #define ENTRY(name, value) \
   __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(value)))
@@ -370,6 +373,54 @@ void lwip_rust_config(void)
   ENTRY(DNS_HOOKS, 0);
 #endif
 
+  /* dhcp.c. */
+  SWITCH(ESP_LWIP_DHCP_FINE_TIMERS_ONDEMAND);
+  SWITCH(LWIP_DHCP_DOES_ACD_CHECK);
+  SWITCH(LWIP_DHCP_GET_NTP_SRV);
+  SWITCH(LWIP_DHCP_BOOTP_FILE);
+  SWITCH(LWIP_DHCP_DISCOVER_ADD_HOSTNAME);
+  SWITCH(LWIP_DHCP_AUTOIP_COOP);
+  SWITCH(DHCP_DEFINE_CUSTOM_TIMEOUTS);
+  ENTRY(DHCP_OPTIONS_LEN, DHCP_OPTIONS_LEN);
+  ENTRY(DHCP_COARSE_TIMER_SECS, DHCP_COARSE_TIMER_SECS);
+  ENTRY(DHCP_FINE_TIMER_MSECS, DHCP_FINE_TIMER_MSECS);
+  ENTRY(SIZEOF_DHCP_TIMEOUT_T, sizeof(dhcp_timeout_t));
+  ENTRY(LWIP_NETIF_CLIENT_DATA_INDEX_DHCP_, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP);
+#ifdef DNS_FALLBACK_SERVER_INDEX
+  ENTRY(DNS_FALLBACK_SERVER_INDEX, DNS_FALLBACK_SERVER_INDEX);
+#endif
+  /* dhcp.c's own derived values, computed as it computes them. */
+#if LWIP_DNS && LWIP_DHCP_MAX_DNS_SERVERS
+#if DNS_MAX_SERVERS > LWIP_DHCP_MAX_DNS_SERVERS
+  ENTRY(LWIP_DHCP_PROVIDE_DNS_SERVERS_, LWIP_DHCP_MAX_DNS_SERVERS);
+#else
+  ENTRY(LWIP_DHCP_PROVIDE_DNS_SERVERS_, DNS_MAX_SERVERS);
+#endif
+#else
+  ENTRY(LWIP_DHCP_PROVIDE_DNS_SERVERS_, 0);
+#endif
+#if DHCP_DEFINE_CUSTOM_TIMEOUTS
+  ENTRY(DHCP_NEXT_TIMEOUT_THRESHOLD_, DHCP_NEXT_TIMEOUT_THRESHOLD);
+  /* dhcp.rs computes the back-off as ESP-IDF defines it; these are checked against it. */
+  ENTRY(DHCP_BACKOFF_1, DHCP_REQUEST_BACKOFF_SEQUENCE(0, 1));
+  ENTRY(DHCP_BACKOFF_4, DHCP_REQUEST_BACKOFF_SEQUENCE(0, 4));
+  ENTRY(DHCP_BACKOFF_5, DHCP_REQUEST_BACKOFF_SEQUENCE(0, 5));
+  ENTRY(DHCP_BACKOFF_255, DHCP_REQUEST_BACKOFF_SEQUENCE(0, 255));
+#endif
+  /* Hooks and overrides dhcp.rs does not port; ESP-IDF's option hooks it does. */
+#if defined(LWIP_HOOK_DHCP_POST_INIT) || defined(DHCP_GLOBAL_XID) || defined(DHCP_GLOBAL_XID_HEADER) || \
+    defined(DHCP_ADD_EXTRA_REQUEST_OPTIONS) || defined(LWIP_DHCP_INPUT_ERROR) || \
+    (defined(DHCP_CREATE_RAND_XID) && !DHCP_CREATE_RAND_XID)
+  ENTRY(DHCP_HOOKS, 1);
+#else
+  ENTRY(DHCP_HOOKS, 0);
+#endif
+#if defined(LWIP_HOOK_DHCP_PARSE_OPTION) && defined(LWIP_HOOK_DHCP_APPEND_OPTIONS)
+  ENTRY(DHCP_ESP_OPTION_HOOKS, 1);
+#else
+  ENTRY(DHCP_ESP_OPTION_HOOKS, 0);
+#endif
+
   /* Layouts. */
   ENTRY(SIZEOF_POINTER, sizeof(void *));
   ENTRY(SIZEOF_PBUF, sizeof(struct pbuf));
@@ -475,6 +526,19 @@ void lwip_rust_config(void)
   ENTRY(SIZEOF_STRUCT_UDP_HDR, sizeof(struct udp_hdr));
   ENTRY(UDP_HDR_DEST, offsetof(struct udp_hdr, dest));
   ENTRY(SIZEOF_RAW_INPUT_STATE, sizeof(raw_input_state_t));
+  ENTRY(SIZEOF_STRUCT_DHCP, sizeof(struct dhcp));
+  ENTRY(DHCP_REQUEST_TIMEOUT, offsetof(struct dhcp, request_timeout));
+  ENTRY(DHCP_T0_TIMEOUT, offsetof(struct dhcp, t0_timeout));
+  ENTRY(DHCP_SERVER_IP_ADDR, offsetof(struct dhcp, server_ip_addr));
+  ENTRY(DHCP_OFFERED_IP_ADDR, offsetof(struct dhcp, offered_ip_addr));
+  ENTRY(DHCP_OFFERED_T2_REBIND, offsetof(struct dhcp, offered_t2_rebind));
+  ENTRY(DHCP_ACD, offsetof(struct dhcp, acd));
+  ENTRY(SIZEOF_STRUCT_ACD, sizeof(struct acd));
+  ENTRY(ACD_STATE, offsetof(struct acd, state));
+  ENTRY(ACD_TTW, offsetof(struct acd, ttw));
+  ENTRY(ACD_CONFLICT_CALLBACK, offsetof(struct acd, acd_conflict_callback));
+  ENTRY(SIZEOF_STRUCT_DHCP_MSG, sizeof(struct dhcp_msg));
+  ENTRY(DHCP_MSG_OPTIONS, offsetof(struct dhcp_msg, options));
   ENTRY(SIZEOF_UDP_PCB, sizeof(struct udp_pcb));
   ENTRY(UDP_PCB_REMOTE_IP, offsetof(struct udp_pcb, remote_ip));
   ENTRY(UDP_PCB_NETIF_IDX, offsetof(struct udp_pcb, netif_idx));
