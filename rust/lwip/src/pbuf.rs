@@ -744,7 +744,7 @@ pub unsafe extern "C" fn pbuf_free(p: *mut Pbuf) -> u8 {
 #[cfg_attr(target_os = "none", unsafe(no_mangle))]
 pub unsafe extern "C" fn pbuf_clen(p: *const Pbuf) -> u16 {
     // SAFETY: forwarded from the caller.
-    unsafe { crate::types::pbuf_chain(p) }.fold(0_u16, |len, _| len.wrapping_add(1))
+    unsafe { crate::types::pbuf_iter(p) }.fold(0_u16, |len, _| len.wrapping_add(1))
 }
 
 /// Increment the reference count of the pbuf.

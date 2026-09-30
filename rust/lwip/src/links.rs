@@ -103,6 +103,27 @@ ported! {
     ip4_frag "ip4_frag": fn ip4_frag(p: *mut Pbuf, netif: *mut Netif, dest: *const Ip4Addr) -> ErrT;
     icmp "icmp": fn icmp_input(p: *mut Pbuf, inp: *mut Netif);
     icmp "icmp": fn icmp_dest_unreach(p: *mut Pbuf, t: IcmpDurType);
+    ip4 "ip4": fn ip4_output_if_src(
+        p: *mut Pbuf,
+        src: *const Ip4Addr,
+        dest: *const Ip4Addr,
+        ttl: u8,
+        tos: u8,
+        proto: u8,
+        netif: *mut Netif,
+    ) -> ErrT;
+    inet_chksum "inet_chksum": fn ip_chksum_pseudo(
+        p: *mut Pbuf,
+        proto: u8,
+        proto_len: u16,
+        src: *const IpAddr,
+        dest: *const IpAddr,
+    ) -> u16;
+    pbuf "pbuf": fn pbuf_chain(h: *mut Pbuf, t: *mut Pbuf);
+    netif "netif": fn netif_get_by_index(idx: u8) -> *mut Netif;
+    netif "netif": fn netif_get_ip6_addr_match(netif: *mut Netif, ip6addr: *const Ip6Addr) -> i8;
+    udp "udp": fn udp_input(p: *mut Pbuf, inp: *mut Netif);
+    udp "udp": fn udp_netif_ip_addr_changed(old_addr: *const IpAddr, new_addr: *const IpAddr);
     def "def": fn lwip_itoa(result: *mut c_char, bufsize: usize, number: c_int);
     ip4_addr "ip4_addr": fn ip4_addr_isbroadcast_u32(addr: u32, netif: *const Netif) -> u8;
     ethernet "ethernet": fn ethernet_input(p: *mut Pbuf, netif: *mut Netif) -> ErrT;
@@ -122,7 +143,19 @@ c_only! {
     fn ip6_input(p: *mut Pbuf, inp: *mut Netif) -> ErrT;
     fn ip4_route_src_hook(src: *const Ip4Addr, dest: *const Ip4Addr) -> *mut Netif;
     fn raw_input(p: *mut Pbuf, inp: *mut Netif) -> RawInputState;
-    fn udp_input(p: *mut Pbuf, inp: *mut Netif);
+    fn esp_random() -> u32;
+    fn ip6_route(src: *const Ip6Addr, dest: *const Ip6Addr) -> *mut Netif;
+    fn ip6_select_source_address(netif: *mut Netif, dest: *const Ip6Addr) -> *const IpAddr;
+    fn ip6_output_if_src(
+        p: *mut Pbuf,
+        src: *const Ip6Addr,
+        dest: *const Ip6Addr,
+        hl: u8,
+        tc: u8,
+        nexth: u8,
+        netif: *mut Netif,
+    ) -> ErrT;
+    fn icmp6_dest_unreach(p: *mut Pbuf, c: core::ffi::c_uint);
     fn tcp_input(p: *mut Pbuf, inp: *mut Netif);
     fn igmp_input(p: *mut Pbuf, inp: *mut Netif, dest: *const Ip4Addr);
     fn igmp_lookfor_group(ifp: *mut Netif, addr: *const Ip4Addr) -> *mut c_void;
@@ -140,7 +173,6 @@ c_only! {
     fn nd6_cleanup_netif(netif: *mut Netif);
     fn nd6_adjust_mld_membership(netif: *mut Netif, addr_idx: i8, new_state: u8);
     fn tcp_netif_ip_addr_changed(old_addr: *const IpAddr, new_addr: *const IpAddr);
-    fn udp_netif_ip_addr_changed(old_addr: *const IpAddr, new_addr: *const IpAddr);
     fn raw_netif_ip_addr_changed(old_addr: *const IpAddr, new_addr: *const IpAddr);
 }
 
@@ -221,4 +253,48 @@ mod c_ip {
 pub(crate) fn ip_data() -> *mut IpGlobals {
     // SAFETY: only the address is taken.
     unsafe { &raw mut c_ip::ip_data }
+}
+
+#[cfg(not(all(feature = "ip4_addr", lwip_ipv4)))]
+mod c_ip4_addr {
+    use super::IpAddr;
+
+    unsafe extern "C" {
+        pub(super) static ip_addr_any: IpAddr;
+        pub(super) static ip_addr_broadcast: IpAddr;
+    }
+}
+
+/// `IP_ADDR_ANY`: ip4_addr.c's 0.0.0.0, Rust or C.
+pub(crate) fn ip_addr_any() -> *const IpAddr {
+    #[cfg(all(feature = "ip4_addr", lwip_ipv4))]
+    let address = &raw const crate::ip4_addr::ip_addr_any;
+    #[cfg(not(all(feature = "ip4_addr", lwip_ipv4)))]
+    // SAFETY: only the address of the C constant is taken.
+    let address = unsafe { &raw const c_ip4_addr::ip_addr_any };
+    address
+}
+
+/// `IP_ADDR_BROADCAST`: ip4_addr.c's 255.255.255.255, Rust or C.
+pub(crate) fn ip_addr_broadcast() -> *const IpAddr {
+    #[cfg(all(feature = "ip4_addr", lwip_ipv4))]
+    let address = &raw const crate::ip4_addr::ip_addr_broadcast;
+    #[cfg(not(all(feature = "ip4_addr", lwip_ipv4)))]
+    // SAFETY: only the address of the C constant is taken.
+    let address = unsafe { &raw const c_ip4_addr::ip_addr_broadcast };
+    address
+}
+
+mod c_ip_any_type {
+    use super::IpAddr;
+
+    unsafe extern "C" {
+        pub(super) static ip_addr_any_type: IpAddr;
+    }
+}
+
+/// `IP_ANY_TYPE`: ip.c's dual-stack any address (ip.c is C).
+pub(crate) fn ip_addr_any_type() -> *const IpAddr {
+    // SAFETY: only the address of the C constant is taken.
+    unsafe { &raw const c_ip_any_type::ip_addr_any_type }
 }

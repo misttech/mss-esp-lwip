@@ -83,13 +83,39 @@ extern "C" fn tcpip_input(p: *mut Pbuf, _inp: *mut Netif) -> ErrT {
 static mut ip_data: MaybeUninit<IpGlobals> = MaybeUninit::zeroed();
 
 /// Packets the protocol stand-ins received.
-pub(crate) static UDP_INPUTS: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static TCP_INPUTS: AtomicUsize = AtomicUsize::new(0);
 
+/// ip.c's `ip_addr_any_type`: the dual-stack any address.
 #[unsafe(no_mangle)]
-extern "C" fn udp_input(p: *mut Pbuf, _inp: *mut Netif) {
-    UDP_INPUTS.fetch_add(1, Relaxed);
-    consume(p);
+static ip_addr_any_type: IpAddr = IpAddr {
+    u_addr: crate::types::IpAddrUnion {
+        ip4: Ip4Addr { addr: 0 },
+    },
+    type_: crate::types::IPADDR_TYPE_ANY,
+};
+
+/// `esp_random`: a fixed sequence, so tests are repeatable.
+#[unsafe(no_mangle)]
+extern "C" fn esp_random() -> u32 {
+    static STATE: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0x1234_5678);
+    STATE.fetch_add(0x9e37_79b9, Relaxed)
+}
+
+/// Packets the IPv6 output stand-in was handed (it does not consume them).
+pub(crate) static IP6_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
+
+#[unsafe(no_mangle)]
+extern "C" fn ip6_output_if_src(
+    _p: *mut Pbuf,
+    _src: *const c_void,
+    _dest: *const c_void,
+    _hl: u8,
+    _tc: u8,
+    _nexth: u8,
+    _netif: *mut Netif,
+) -> ErrT {
+    IP6_OUTPUTS.fetch_add(1, Relaxed);
+    0
 }
 
 #[unsafe(no_mangle)]
@@ -130,9 +156,11 @@ no_ops! {
     fn nd6_cleanup_netif(netif: *mut Netif);
     fn nd6_adjust_mld_membership(netif: *mut Netif, addr_idx: i8, state: u8);
     fn tcp_netif_ip_addr_changed(old: *const IpAddr, new: *const IpAddr);
-    fn udp_netif_ip_addr_changed(old: *const IpAddr, new: *const IpAddr);
     fn raw_netif_ip_addr_changed(old: *const IpAddr, new: *const IpAddr);
     fn raw_input(p: *mut Pbuf, inp: *mut Netif) -> RawInputState = RAW_INPUT_NONE;
     fn igmp_lookfor_group(ifp: *mut Netif, addr: *const Ip4Addr) -> *mut c_void = core::ptr::null_mut();
     fn ip4_route_src_hook(src: *const Ip4Addr, dest: *const Ip4Addr) -> *mut Netif = core::ptr::null_mut();
+    fn ip6_route(src: *const c_void, dest: *const c_void) -> *mut Netif = core::ptr::null_mut();
+    fn ip6_select_source_address(netif: *mut Netif, dest: *const c_void) -> *const IpAddr = core::ptr::null();
+    fn icmp6_dest_unreach(p: *mut Pbuf, c: core::ffi::c_uint);
 }

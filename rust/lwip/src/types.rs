@@ -167,7 +167,7 @@ pub struct PbufCustom {
 ///
 /// `p` is null or the first pbuf of a well-formed chain, whose pbufs outlive `'a` and are
 /// not written while it is walked.
-pub unsafe fn pbuf_chain<'a>(p: *const Pbuf) -> impl Iterator<Item = &'a Pbuf> {
+pub unsafe fn pbuf_iter<'a>(p: *const Pbuf) -> impl Iterator<Item = &'a Pbuf> {
     // SAFETY: `p` is null or a valid pbuf, per the caller.
     let first = unsafe { p.as_ref() };
     // SAFETY: every `next` of a well-formed chain is null or a valid pbuf.
@@ -334,6 +334,39 @@ impl IpAddr {
     pub fn copy_from_ip6(&mut self, src: &Ip6Addr) {
         *self.ip6_mut() = *src;
         self.type_ = IPADDR_TYPE_V6;
+    }
+}
+
+#[cfg(all(lwip_ipv4, lwip_ipv6))]
+impl IpAddr {
+    /// `ip_addr_isany()`: all zero, as its type reads it.
+    pub fn is_any(&self) -> bool {
+        if self.is_v6() {
+            self.ip6().addr == [0; 4]
+        } else {
+            self.ip4().addr == IPADDR_ANY
+        }
+    }
+
+    /// `ip_addr_eq()`: the same type and address (and zone, for IPv6).
+    pub fn eq_addr(&self, other: &IpAddr) -> bool {
+        if self.type_ != other.type_ {
+            return false;
+        }
+        if self.is_v6() {
+            self.ip6().addr == other.ip6().addr && self.ip6().zone == other.ip6().zone
+        } else {
+            self.ip4().addr == other.ip4().addr
+        }
+    }
+
+    /// `ip_addr_ismulticast()`: ff00::/8 or 224.0.0.0/4.
+    pub fn is_multicast(&self) -> bool {
+        if self.is_v6() {
+            self.ip6().addr[0] & 0xff00_0000_u32.to_be() == 0xff00_0000_u32.to_be()
+        } else {
+            self.ip4().addr & 0xf000_0000_u32.to_be() == 0xe000_0000_u32.to_be()
+        }
     }
 }
 
@@ -796,6 +829,84 @@ pub struct IcmpHdr {
 /// `dest`).
 pub const UDP_HDR_DEST: usize = 2;
 
+/// The UDP header (`struct udp_hdr`, packed), in network byte order.
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct UdpHdr {
+    /// Source port.
+    pub src: u16,
+    /// Destination port.
+    pub dest: u16,
+    /// Length of header and data.
+    pub len: u16,
+    /// Checksum.
+    pub chksum: u16,
+}
+
+/// `UDP_HLEN`.
+pub const UDP_HLEN: u16 = 8;
+
+/// `udp_recv_fn`: the receive callback of a UDP PCB. It owns `p`.
+pub type UdpRecvFn = Option<
+    unsafe extern "C" fn(
+        arg: *mut c_void,
+        pcb: *mut UdpPcb,
+        p: *mut Pbuf,
+        addr: *const IpAddr,
+        port: u16,
+    ),
+>;
+
+/// A UDP protocol control block (`struct udp_pcb`).
+#[repr(C)]
+pub struct UdpPcb {
+    /// Local IP address, in network byte order.
+    pub local_ip: IpAddr,
+    /// Remote IP address, in network byte order.
+    pub remote_ip: IpAddr,
+    /// Bound netif index.
+    pub netif_idx: u8,
+    /// Socket options.
+    pub so_options: u8,
+    /// Type Of Service.
+    pub tos: u8,
+    /// Time To Live.
+    pub ttl: u8,
+    /// Next PCB on the list.
+    pub next: *mut UdpPcb,
+    /// `UDP_FLAGS_*`.
+    pub flags: u8,
+    /// Local port, in host byte order.
+    pub local_port: u16,
+    /// Remote port, in host byte order.
+    pub remote_port: u16,
+    /// Outgoing network interface for multicast packets, by IPv4 address (if not 'any').
+    #[cfg(all(lwip_multicast_tx_options, lwip_ipv4))]
+    pub mcast_ip4: Ip4Addr,
+    /// Outgoing network interface for multicast packets, by interface index (if nonzero).
+    #[cfg(lwip_multicast_tx_options)]
+    pub mcast_ifindex: u8,
+    /// TTL for outgoing multicast packets.
+    #[cfg(lwip_multicast_tx_options)]
+    pub mcast_ttl: u8,
+    /// Receive callback function.
+    pub recv: UdpRecvFn,
+    /// User-supplied argument for the recv callback.
+    pub recv_arg: *mut c_void,
+}
+
+/// `UDP_FLAGS_NOCHKSUM`.
+pub const UDP_FLAGS_NOCHKSUM: u8 = 0x01;
+/// `UDP_FLAGS_CONNECTED`.
+pub const UDP_FLAGS_CONNECTED: u8 = 0x04;
+/// `UDP_FLAGS_MULTICAST_LOOP`.
+pub const UDP_FLAGS_MULTICAST_LOOP: u8 = 0x08;
+/// `SOF_REUSEADDR`: allow local address reuse.
+pub const SOF_REUSEADDR: u8 = 0x04;
+
+/// `ERR_USE`: address in use.
+pub const ERR_USE: ErrT = -8;
+
 /// `raw_input_state_t`: what raw_input did with a packet (a C enum).
 pub type RawInputState = core::ffi::c_uint;
 /// The packet did not match any PCB.
@@ -945,6 +1056,21 @@ mod layout {
     fp::static_assert!(size_of::<IcmpHdr>() == SIZEOF_STRUCT_ICMP_HDR);
     fp::static_assert!(size_of::<RawInputState>() == SIZEOF_RAW_INPUT_STATE);
     fp::static_assert!(super::UDP_HDR_DEST == crate::config::UDP_HDR_DEST);
+    fp::static_assert!(size_of::<UdpHdr>() == SIZEOF_STRUCT_UDP_HDR);
+    fp::static_assert!(size_of::<UdpPcb>() == SIZEOF_UDP_PCB);
+    fp::static_assert!(offset_of!(UdpPcb, remote_ip) == UDP_PCB_REMOTE_IP);
+    fp::static_assert!(offset_of!(UdpPcb, netif_idx) == UDP_PCB_NETIF_IDX);
+    fp::static_assert!(offset_of!(UdpPcb, ttl) == UDP_PCB_TTL);
+    fp::static_assert!(offset_of!(UdpPcb, next) == UDP_PCB_NEXT);
+    fp::static_assert!(offset_of!(UdpPcb, flags) == UDP_PCB_FLAGS);
+    fp::static_assert!(offset_of!(UdpPcb, local_port) == UDP_PCB_LOCAL_PORT);
+    fp::static_assert!(offset_of!(UdpPcb, remote_port) == UDP_PCB_REMOTE_PORT);
+    #[cfg(all(lwip_multicast_tx_options, lwip_ipv4))]
+    fp::static_assert!(offset_of!(UdpPcb, mcast_ip4) == UDP_PCB_MCAST_IP4);
+    #[cfg(lwip_multicast_tx_options)]
+    fp::static_assert!(offset_of!(UdpPcb, mcast_ttl) == UDP_PCB_MCAST_TTL);
+    fp::static_assert!(offset_of!(UdpPcb, recv) == UDP_PCB_RECV);
+    fp::static_assert!(offset_of!(UdpPcb, recv_arg) == UDP_PCB_RECV_ARG);
     fp::static_assert!(size_of::<EthAddr>() == SIZEOF_ETH_ADDR);
     fp::static_assert!(size_of::<EthHdr>() == SIZEOF_STRUCT_ETH_HDR);
     fp::static_assert!(offset_of!(EthHdr, type_) == ETH_HDR_TYPE);

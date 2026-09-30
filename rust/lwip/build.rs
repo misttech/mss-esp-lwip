@@ -97,6 +97,14 @@ const SWITCHES: &[(&str, u64)] = &[
     ("LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN_DEFINED", 0),
     ("LWIP_HOOK_IP4_ROUTE_SRC_DEFINED", 1),
     ("LWIP_IP4_HOOKS", 0),
+    ("CHECKSUM_GEN_UDP", 1),
+    ("CHECKSUM_CHECK_UDP", 0),
+    ("IP_SOF_BROADCAST", 0),
+    ("IP_SOF_BROADCAST_RECV", 0),
+    ("LWIP_ICMP6", 1),
+    ("SO_REUSE", 1),
+    ("SO_REUSE_RXTOALL", 1),
+    ("LWIP_RAND_DEFINED", 1),
 ];
 
 /// Values. ESP-IDF v6.1 defaults.
@@ -128,7 +136,11 @@ const VALUES: &[(&str, u64)] = &[
     ("NETIF_NAMESIZE", 6),
     ("PBUF_LINK_LAYER", 14),
     ("PBUF_IP_LAYER", 54),
+    ("PBUF_TRANSPORT_LAYER", 74),
     ("ICMP_TTL", 64),
+    ("UDP_TTL", 64),
+    ("UDP_LOCAL_PORT_RANGE_START_", 0xc000),
+    ("UDP_LOCAL_PORT_RANGE_END_", 0xffff),
     // Read only when a tcp_pcb exists; host tests have none.
     ("TCP_PCB_NEXT", 0),
     ("TCP_PCB_OOSEQ", 0),
@@ -169,7 +181,8 @@ fn main() {
         .chain(VALUES)
         .map(|&(name, value)| (name.to_string(), value))
         .collect();
-    // A host's struct pbuf is wider than the target's: size the pbuf pools for it.
+    // A host's struct pbuf and struct udp_pcb are wider than the target's: size their
+    // pools for them.
     let pointer =
         env::var("CARGO_CFG_TARGET_POINTER_WIDTH").map_or(4, |w| w.parse::<u64>().unwrap() / 8);
     let host_pbuf = (2 * pointer + 8).next_multiple_of(pointer);
@@ -180,6 +193,8 @@ fn main() {
             let size = match name {
                 "PBUF" => host_pbuf,
                 "PBUF_POOL" => host_pbuf + 1516,
+                // Three pointers: next, recv, and recv_arg.
+                "UDP_PCB" => (size + 3 * (pointer - 4)).next_multiple_of(pointer),
                 _ => size,
             };
             (name.to_string(), index as u64, size)
@@ -417,6 +432,30 @@ fn main() {
             ("LWIP_BROADCAST_PING", 0),
             ("LWIP_MULTICAST_PING", 0),
             ("LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN_DEFINED", 0),
+        ],
+    );
+    // udp.rs translates udp.c as ESP-IDF configures it.
+    requires(
+        "udp",
+        &[
+            ("LWIP_IPV4", 1),
+            ("LWIP_IPV6", 1),
+            ("LWIP_IPV6_SCOPES", 1),
+            ("LWIP_UDP", 1),
+            ("LWIP_UDPLITE", 0),
+            ("CHECKSUM_GEN_UDP", 1),
+            ("CHECKSUM_CHECK_UDP", 0),
+            ("LWIP_CHECKSUM_ON_COPY", 0),
+            ("IP_SOF_BROADCAST", 0),
+            ("IP_SOF_BROADCAST_RECV", 0),
+            ("LWIP_ICMP", 1),
+            ("LWIP_ICMP6", 1),
+            ("LWIP_MULTICAST_TX_OPTIONS", 1),
+            ("SO_REUSE", 1),
+            ("SO_REUSE_RXTOALL", 1),
+            ("LWIP_RAND_DEFINED", 1),
+            ("ESP_LWIP", 1),
+            ("LWIP_NETIF_USE_HINTS", 0),
         ],
     );
     if env::var_os("CARGO_FEATURE_NETIF").is_some() {

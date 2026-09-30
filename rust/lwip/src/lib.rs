@@ -23,7 +23,8 @@
         feature = "etharp",
         feature = "ip4",
         feature = "ip4_frag",
-        feature = "icmp"
+        feature = "icmp",
+        feature = "udp"
     )),
     allow(dead_code, unused_imports, unused_macros)
 )]
@@ -67,3 +68,5 @@ pub mod ip4_frag;
 pub mod netif;
 #[cfg(feature = "pbuf")]
 pub mod pbuf;
+#[cfg(feature = "udp")]
+pub mod udp;
