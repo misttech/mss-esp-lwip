@@ -18,5 +18,6 @@ char *strcpy(char *restrict dst, const char *restrict src);
 char *strncpy(char *restrict dst, const char *restrict src, size_t n);
 char *strcat(char *restrict dst, const char *restrict src);
 char *strchr(const char *s, int c);
+char *strstr(const char *haystack, const char *needle);
 
 #endif /* STRING_H */

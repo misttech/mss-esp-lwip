@@ -31,6 +31,7 @@ pub use stdio::putchar;
 pub use stdlib::{abort, atoi};
 pub use string::{
     memcmp, memcpy, memmove, memset, strcat, strchr, strcmp, strcpy, strlen, strncmp, strncpy,
+    strstr,
 };
 
 #[cfg(target_os = "none")]
