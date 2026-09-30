@@ -24,7 +24,8 @@
         feature = "ip4",
         feature = "ip4_frag",
         feature = "icmp",
-        feature = "udp"
+        feature = "udp",
+        feature = "dns"
     )),
     allow(dead_code, unused_imports, unused_macros)
 )]
@@ -50,6 +51,8 @@ mod test_support;
 
 #[cfg(feature = "def")]
 pub mod def;
+#[cfg(feature = "dns")]
+pub mod dns;
 #[cfg(feature = "etharp")]
 pub mod etharp;
 #[cfg(feature = "ethernet")]

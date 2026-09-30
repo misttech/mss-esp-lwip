@@ -164,3 +164,36 @@ no_ops! {
     fn ip6_select_source_address(netif: *mut Netif, dest: *const c_void) -> *const IpAddr = core::ptr::null();
     fn icmp6_dest_unreach(p: *mut Pbuf, c: core::ffi::c_uint);
 }
+
+/// The timeouts `sys_timeout` set and `sys_untimeout` has not cleared: handler and
+/// argument, as addresses.
+pub(crate) static TIMEOUTS: Mutex<std::vec::Vec<(usize, usize)>> = Mutex::new(std::vec::Vec::new());
+
+/// `sys_timeout`: recorded, not run; a test fires a timer by calling its function.
+#[unsafe(no_mangle)]
+extern "C" fn sys_timeout(_msecs: u32, handler: crate::types::SysTimeoutHandler, arg: *mut c_void) {
+    let entry = (handler.map_or(0, |h| h as usize), arg as usize);
+    TIMEOUTS.lock().unwrap().push(entry);
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn sys_untimeout(handler: crate::types::SysTimeoutHandler, arg: *mut c_void) {
+    let entry = (handler.map_or(0, |h| h as usize), arg as usize);
+    TIMEOUTS.lock().unwrap().retain(|&e| e != entry);
+}
+
+/// `ipaddr_aton`: ip.c's, for IPv4 dotted addresses, which is all the tests pass it.
+#[unsafe(no_mangle)]
+extern "C" fn ipaddr_aton(cp: *const core::ffi::c_char, addr: *mut IpAddr) -> core::ffi::c_int {
+    let mut ip4 = Ip4Addr { addr: 0 };
+    // SAFETY: a C string and an address to fill, as ip.c's contract.
+    unsafe {
+        if crate::ip4_addr::ip4addr_aton(cp, &mut ip4) == 0 {
+            return 0;
+        }
+        if !addr.is_null() {
+            (*addr).copy_from_ip4(ip4.addr);
+        }
+    }
+    1
+}

@@ -846,6 +846,9 @@ pub struct UdpHdr {
 /// `UDP_HLEN`.
 pub const UDP_HLEN: u16 = 8;
 
+/// `sys_timeout_handler`: a function `sys_timeout` calls with its argument.
+pub type SysTimeoutHandler = Option<unsafe extern "C" fn(arg: *mut c_void)>;
+
 /// `udp_recv_fn`: the receive callback of a UDP PCB. It owns `p`.
 pub type UdpRecvFn = Option<
     unsafe extern "C" fn(
@@ -906,6 +909,8 @@ pub const SOF_REUSEADDR: u8 = 0x04;
 
 /// `ERR_USE`: address in use.
 pub const ERR_USE: ErrT = -8;
+/// `ERR_INPROGRESS`: operation in progress.
+pub const ERR_INPROGRESS: ErrT = -5;
 
 /// `raw_input_state_t`: what raw_input did with a packet (a C enum).
 pub type RawInputState = core::ffi::c_uint;

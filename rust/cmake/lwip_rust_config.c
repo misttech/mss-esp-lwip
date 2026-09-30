@@ -51,7 +51,7 @@
 #include "lwip/prot/icmp.h"
 #include "lwip/prot/udp.h"
 #include "lwip/priv/raw_priv.h"
-#include "lwip/udp.h"
+#include "lwip/prot/dns.h"
 
 #define ENTRY(name, value) \
   __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(value)))
@@ -322,6 +322,52 @@ void lwip_rust_config(void)
   ENTRY(LWIP_RAND_DEFINED, 1);
 #else
   ENTRY(LWIP_RAND_DEFINED, 0);
+#endif
+
+  /* dns.c. */
+  SWITCH(LWIP_DNS);
+  SWITCH(ESP_DNS);
+  SWITCH(ESP_LWIP_DNS_TIMERS_ONDEMAND);
+  SWITCH(LWIP_DNS_SETSERVER_WITH_NETIF);
+  SWITCH(LWIP_DNS_SUPPORT_MDNS_QUERIES);
+  SWITCH(DNS_LOCAL_HOSTLIST);
+  SWITCH(DNS_DOES_NAME_CHECK);
+  ENTRY(LWIP_DNS_SECURE, LWIP_DNS_SECURE);
+  ENTRY(DNS_TABLE_SIZE, DNS_TABLE_SIZE);
+  ENTRY(DNS_MAX_NAME_LENGTH, DNS_MAX_NAME_LENGTH);
+  ENTRY(DNS_MAX_SERVERS, DNS_MAX_SERVERS);
+  ENTRY(DNS_MAX_RETRIES, DNS_MAX_RETRIES);
+  ENTRY(DNS_MAX_HOST_IP, DNS_MAX_HOST_IP);
+  ENTRY(DNS_TMR_INTERVAL, DNS_TMR_INTERVAL);
+  ENTRY(LWIP_DNS_ADDRTYPE_DEFAULT, LWIP_DNS_ADDRTYPE_DEFAULT);
+  /* dns.c's own defaults and derived sizes, computed as it computes them. */
+#ifdef DNS_MAX_TTL
+  ENTRY(DNS_MAX_TTL_, DNS_MAX_TTL);
+#else
+  ENTRY(DNS_MAX_TTL_, 604800);
+#endif
+#if ((LWIP_DNS_SECURE & LWIP_DNS_SECURE_NO_MULTIPLE_OUTSTANDING) != 0) && defined(DNS_MAX_REQUESTS)
+  ENTRY(DNS_MAX_REQUESTS_, DNS_MAX_REQUESTS);
+#else
+  ENTRY(DNS_MAX_REQUESTS_, DNS_TABLE_SIZE);
+#endif
+#if ((LWIP_DNS_SECURE & LWIP_DNS_SECURE_RAND_SRC_PORT) != 0) && defined(DNS_MAX_SOURCE_PORTS)
+  ENTRY(DNS_MAX_SOURCE_PORTS_, DNS_MAX_SOURCE_PORTS);
+#elif ((LWIP_DNS_SECURE & LWIP_DNS_SECURE_RAND_SRC_PORT) != 0) && \
+    ((LWIP_DNS_SECURE & LWIP_DNS_SECURE_NO_MULTIPLE_OUTSTANDING) != 0) && defined(DNS_MAX_REQUESTS)
+  ENTRY(DNS_MAX_SOURCE_PORTS_, DNS_MAX_REQUESTS);
+#elif ((LWIP_DNS_SECURE & LWIP_DNS_SECURE_RAND_SRC_PORT) != 0)
+  ENTRY(DNS_MAX_SOURCE_PORTS_, DNS_TABLE_SIZE);
+#else
+  ENTRY(DNS_MAX_SOURCE_PORTS_, 1);
+#endif
+  /* Hooks and overrides dns.rs does not port. */
+#if defined(DNS_RAND_TXID) || defined(DNS_PORT_ALLOWED) || defined(DNS_SERVER_ADDRESS) || \
+    defined(FALLBACK_DNS_SERVER_ADDRESS) || defined(LWIP_HOOK_DNS_EXTERNAL_RESOLVE) || \
+    defined(DNS_LOOKUP_LOCAL_EXTERN)
+  ENTRY(DNS_HOOKS, 1);
+#else
+  ENTRY(DNS_HOOKS, 0);
 #endif
 
   /* Layouts. */
