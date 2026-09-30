@@ -105,6 +105,13 @@ const SWITCHES: &[(&str, u64)] = &[
     ("SO_REUSE", 1),
     ("SO_REUSE_RXTOALL", 1),
     ("LWIP_RAND_DEFINED", 1),
+    ("LWIP_DNS", 1),
+    ("ESP_DNS", 1),
+    ("ESP_LWIP_DNS_TIMERS_ONDEMAND", 1),
+    ("LWIP_DNS_SETSERVER_WITH_NETIF", 0),
+    ("LWIP_DNS_SUPPORT_MDNS_QUERIES", 1),
+    ("DNS_LOCAL_HOSTLIST", 0),
+    ("DNS_DOES_NAME_CHECK", 1),
 ];
 
 /// Values. ESP-IDF v6.1 defaults.
@@ -141,6 +148,18 @@ const VALUES: &[(&str, u64)] = &[
     ("UDP_TTL", 64),
     ("UDP_LOCAL_PORT_RANGE_START_", 0xc000),
     ("UDP_LOCAL_PORT_RANGE_END_", 0xffff),
+    ("LWIP_DNS_SECURE", 7),
+    ("DNS_TABLE_SIZE", 4),
+    ("DNS_MAX_NAME_LENGTH", 256),
+    ("DNS_MAX_SERVERS", 3),
+    ("DNS_MAX_RETRIES", 4),
+    ("DNS_MAX_HOST_IP", 1),
+    ("DNS_TMR_INTERVAL", 1000),
+    ("LWIP_DNS_ADDRTYPE_DEFAULT", 2),
+    ("DNS_MAX_TTL_", 604800),
+    ("DNS_MAX_REQUESTS_", 4),
+    ("DNS_MAX_SOURCE_PORTS_", 4),
+    ("DNS_HOOKS", 0),
     // Read only when a tcp_pcb exists; host tests have none.
     ("TCP_PCB_NEXT", 0),
     ("TCP_PCB_OOSEQ", 0),
@@ -456,6 +475,27 @@ fn main() {
             ("LWIP_RAND_DEFINED", 1),
             ("ESP_LWIP", 1),
             ("LWIP_NETIF_USE_HINTS", 0),
+        ],
+    );
+    // dns.rs translates dns.c as ESP-IDF configures it.
+    requires(
+        "dns",
+        &[
+            ("LWIP_IPV4", 1),
+            ("LWIP_IPV6", 1),
+            ("LWIP_IPV6_SCOPES", 1),
+            ("LWIP_DNS", 1),
+            ("ESP_DNS", 1),
+            ("ESP_LWIP_DNS_TIMERS_ONDEMAND", 1),
+            ("LWIP_DNS_SETSERVER_WITH_NETIF", 0),
+            ("LWIP_DNS_SUPPORT_MDNS_QUERIES", 1),
+            ("DNS_LOCAL_HOSTLIST", 0),
+            ("DNS_DOES_NAME_CHECK", 1),
+            ("LWIP_HAVE_LOOPIF", 1),
+            ("LWIP_DNS_SECURE", 7),
+            ("LWIP_RAND_DEFINED", 1),
+            ("LWIP_STRNICMP_FN", 1),
+            ("DNS_HOOKS", 0),
         ],
     );
     if env::var_os("CARGO_FEATURE_NETIF").is_some() {

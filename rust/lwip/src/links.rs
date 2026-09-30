@@ -124,6 +124,15 @@ ported! {
     netif "netif": fn netif_get_ip6_addr_match(netif: *mut Netif, ip6addr: *const Ip6Addr) -> i8;
     udp "udp": fn udp_input(p: *mut Pbuf, inp: *mut Netif);
     udp "udp": fn udp_netif_ip_addr_changed(old_addr: *const IpAddr, new_addr: *const IpAddr);
+    udp "udp": fn udp_new_ip_type(type_: u8) -> *mut UdpPcb;
+    udp "udp": fn udp_bind(pcb: *mut UdpPcb, ipaddr: *const IpAddr, port: u16) -> ErrT;
+    udp "udp": fn udp_recv(pcb: *mut UdpPcb, recv: UdpRecvFn, recv_arg: *mut c_void);
+    udp "udp": fn udp_remove(pcb: *mut UdpPcb);
+    udp "udp": fn udp_sendto(pcb: *mut UdpPcb, p: *mut Pbuf, dst_ip: *const IpAddr, dst_port: u16) -> ErrT;
+    pbuf "pbuf": fn pbuf_take(buf: *mut Pbuf, dataptr: *const c_void, len: u16) -> ErrT;
+    pbuf "pbuf": fn pbuf_take_at(buf: *mut Pbuf, dataptr: *const c_void, len: u16, offset: u16) -> ErrT;
+    pbuf "pbuf": fn pbuf_try_get_at(p: *const Pbuf, offset: u16) -> c_int;
+    pbuf "pbuf": fn pbuf_put_at(p: *mut Pbuf, offset: u16, data: u8);
     def "def": fn lwip_itoa(result: *mut c_char, bufsize: usize, number: c_int);
     ip4_addr "ip4_addr": fn ip4_addr_isbroadcast_u32(addr: u32, netif: *const Netif) -> u8;
     ethernet "ethernet": fn ethernet_input(p: *mut Pbuf, netif: *mut Netif) -> ErrT;
@@ -144,6 +153,9 @@ c_only! {
     fn ip4_route_src_hook(src: *const Ip4Addr, dest: *const Ip4Addr) -> *mut Netif;
     fn raw_input(p: *mut Pbuf, inp: *mut Netif) -> RawInputState;
     fn esp_random() -> u32;
+    fn sys_timeout(msecs: u32, handler: SysTimeoutHandler, arg: *mut c_void);
+    fn sys_untimeout(handler: SysTimeoutHandler, arg: *mut c_void);
+    fn ipaddr_aton(cp: *const c_char, addr: *mut IpAddr) -> c_int;
     fn ip6_route(src: *const Ip6Addr, dest: *const Ip6Addr) -> *mut Netif;
     fn ip6_select_source_address(netif: *mut Netif, dest: *const Ip6Addr) -> *const IpAddr;
     fn ip6_output_if_src(
@@ -297,4 +309,25 @@ mod c_ip_any_type {
 pub(crate) fn ip_addr_any_type() -> *const IpAddr {
     // SAFETY: only the address of the C constant is taken.
     unsafe { &raw const c_ip_any_type::ip_addr_any_type }
+}
+
+#[cfg(all(lwip_strnicmp_fn, not(feature = "def")))]
+mod c_def {
+    use core::ffi::{c_char, c_int};
+
+    unsafe extern "C" {
+        pub(super) fn lwip_strnicmp(str1: *const c_char, str2: *const c_char, len: usize) -> c_int;
+    }
+}
+
+/// `lwip_strnicmp()`, def.c's, Rust or C.
+#[cfg(lwip_strnicmp_fn)]
+pub(crate) unsafe fn lwip_strnicmp(str1: *const c_char, str2: *const c_char, len: usize) -> c_int {
+    #[cfg(feature = "def")]
+    // SAFETY: forwarded from the caller.
+    let result = unsafe { crate::def::lwip_strnicmp(str1, str2, len) };
+    #[cfg(not(feature = "def"))]
+    // SAFETY: forwarded from the caller.
+    let result = unsafe { c_def::lwip_strnicmp(str1, str2, len) };
+    result
 }
