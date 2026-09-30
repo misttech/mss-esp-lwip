@@ -25,13 +25,6 @@ extern "C" fn sys_arch_protect() -> SysProt {
 #[unsafe(no_mangle)]
 extern "C" fn sys_arch_unprotect(_pval: SysProt) {}
 
-/// `tcp_active_pcbs`: no TCP connections in host tests.
-#[unsafe(no_mangle)]
-static mut tcp_active_pcbs: *mut c_void = core::ptr::null_mut();
-
-#[unsafe(no_mangle)]
-extern "C" fn tcp_free_ooseq(_pcb: *mut c_void) {}
-
 /// `tcpip_try_callback`: the TCP/IP thread's queue, which the tests do not run. Report it
 /// full, as `ERR_MEM`.
 #[unsafe(no_mangle)]
@@ -154,7 +147,6 @@ no_ops! {
     fn nd6_restart_netif(netif: *mut Netif);
     fn nd6_cleanup_netif(netif: *mut Netif);
     fn nd6_adjust_mld_membership(netif: *mut Netif, addr_idx: i8, state: u8);
-    fn tcp_netif_ip_addr_changed(old: *const IpAddr, new: *const IpAddr);
     fn raw_netif_ip_addr_changed(old: *const IpAddr, new: *const IpAddr);
     fn raw_input(p: *mut Pbuf, inp: *mut Netif) -> RawInputState = RAW_INPUT_NONE;
     fn igmp_lookfor_group(ifp: *mut Netif, addr: *const Ip4Addr) -> *mut c_void = core::ptr::null_mut();
@@ -256,46 +248,42 @@ extern "C" fn dhcp_append_extra_opts(
 ) {
 }
 
-/// tcp.c's `tcp_ticks` and tcp_in.c's `tcp_input_pcb`, until they are ported.
-#[unsafe(no_mangle)]
-pub(crate) static mut tcp_ticks: u32 = 0;
+/// tcp_in.c's `tcp_input_pcb`, until it is ported.
 #[unsafe(no_mangle)]
 pub(crate) static mut tcp_input_pcb: *mut crate::types::TcpPcb = core::ptr::null_mut();
 
-/// tcp.c's `tcp_eff_send_mss_netif`: the MSS the netif's MTU allows for IPv4.
-#[unsafe(no_mangle)]
-extern "C" fn tcp_eff_send_mss_netif(sendmss: u16, outif: *mut Netif, _dest: *const IpAddr) -> u16 {
-    // SAFETY: tcp_out.c passes the netif it routes through, or null.
-    let mtu = unsafe { outif.as_ref() }.map_or(0, |n| n.mtu);
-    if mtu == 0 {
-        sendmss
-    } else {
-        sendmss.min(mtu - 40)
-    }
-}
-
-/// tcp.c's `tcp_seg_free` and `tcp_segs_free`.
-#[unsafe(no_mangle)]
-extern "C" fn tcp_seg_free(seg: *mut crate::types::TcpSeg) {
-    if !seg.is_null() {
-        // SAFETY: a segment from memp with its pbuf.
-        unsafe {
-            if !(*seg).p.is_null() {
-                crate::links::pbuf_free((*seg).p);
-            }
-            crate::links::memp_free(crate::config::MEMP_TCP_SEG, seg.cast());
-        }
-    }
-}
+/// Times TCP asked for its timer (timeouts.c's `tcp_timer_needed`).
+pub(crate) static TCP_TIMER_NEEDED: AtomicUsize = AtomicUsize::new(0);
 
 #[unsafe(no_mangle)]
-extern "C" fn tcp_segs_free(mut seg: *mut crate::types::TcpSeg) {
-    while !seg.is_null() {
-        // SAFETY: a list of live segments.
-        let next = unsafe { (*seg).next };
-        tcp_seg_free(seg);
-        seg = next;
-    }
+extern "C" fn tcp_timer_needed() {
+    TCP_TIMER_NEEDED.fetch_add(1, Relaxed);
+}
+
+/// Times tcp.c asked tcp_in.c to free the PCB it is processing.
+pub(crate) static TCP_INPUT_PCB_CLOSES: AtomicUsize = AtomicUsize::new(0);
+
+#[unsafe(no_mangle)]
+extern "C" fn tcp_trigger_input_pcb_close() {
+    TCP_INPUT_PCB_CLOSES.fetch_add(1, Relaxed);
+}
+
+/// ESP-IDF's `lwip_hook_tcp_isn`: a fixed sequence, so tests are repeatable.
+#[unsafe(no_mangle)]
+extern "C" fn lwip_hook_tcp_isn(
+    _local_ip: *const IpAddr,
+    _local_port: u16,
+    _remote_ip: *const IpAddr,
+    _remote_port: u16,
+) -> u32 {
+    static ISN: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(6510);
+    ISN.fetch_add(64000, Relaxed)
+}
+
+/// nd6.c's `nd6_get_destination_mtu`: the IPv6 minimum link MTU.
+#[unsafe(no_mangle)]
+extern "C" fn nd6_get_destination_mtu(_ip6addr: *const c_void, _netif: *mut Netif) -> u16 {
+    1280
 }
 
 /// Packets the IPv6 output stand-in `ip6_output_if` was handed.

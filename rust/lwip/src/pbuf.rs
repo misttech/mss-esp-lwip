@@ -83,10 +83,6 @@ pub static pbuf_free_ooseq_pending: AtomicU8 = AtomicU8::new(0);
 
 #[cfg(pbuf_pool_free_ooseq)]
 unsafe extern "C" {
-    /// The TCP PCBs in a state in which they accept or send data.
-    static tcp_active_pcbs: *mut c_void;
-    /// Free all ooseq pbufs (and possibly reset SACK state).
-    fn tcp_free_ooseq(pcb: *mut c_void);
     /// Call a specific function in the thread context of tcpip_thread for easy access
     /// synchronization, without waiting if the queue is full.
     fn tcpip_try_callback(
@@ -105,26 +101,17 @@ fn pbuf_free_ooseq() {
     // SYS_ARCH_SET(pbuf_free_ooseq_pending, 0).
     locked(|| pbuf_free_ooseq_pending.store(0, Relaxed));
 
-    // `struct tcp_pcb` is not mirrored until tcp.c is ported: its `next` and `ooseq` are
-    // read at the offsets the configuration reports.
     // SAFETY: `tcp_active_pcbs` is the list TCP keeps in the tcpip thread this runs in;
-    // each PCB on it is live, and `next` and `ooseq` are pointers at those offsets.
+    // each PCB on it is live.
     unsafe {
-        let mut pcb = ptr::addr_of!(tcp_active_pcbs).read();
+        let mut pcb = crate::links::tcp_active_pcbs();
         while !pcb.is_null() {
-            let ooseq = pcb
-                .byte_add(config::TCP_PCB_OOSEQ)
-                .cast::<*mut c_void>()
-                .read();
-            if !ooseq.is_null() {
+            if !(*pcb).ooseq.is_null() {
                 // Free the ooseq pbufs of one PCB only.
-                tcp_free_ooseq(pcb);
+                crate::links::tcp_free_ooseq(pcb);
                 return;
             }
-            pcb = pcb
-                .byte_add(config::TCP_PCB_NEXT)
-                .cast::<*mut c_void>()
-                .read();
+            pcb = (*pcb).next;
         }
     }
 }
