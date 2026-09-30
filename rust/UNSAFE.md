@@ -9,7 +9,7 @@ of the stack moves to Rust and those pointers become references.
 | Module | `unsafe` blocks | `unsafe fn` | `unsafe impl` | What it covers |
 |---|---:|---:|---:|---|
 | `cstr` | 2 | 3 | 0 | Reading C strings of unknown length |
-| `types` | 7 | 14 | 0 | Pbuf payloads and chains; the `ip_addr_t` union; C callback types |
+| `types` | 7 | 15 | 0 | Pbuf payloads and chains; the `ip_addr_t` union; C callback types |
 | `platform` | 1 | 0 | 0 | Calling the C library's `__assert_func` |
 | `sys` | 2 | 0 | 0 | The port's critical section |
 | `global` | 2 | 0 | 1 | lwIP's global variables, laid out as C's |
@@ -27,6 +27,7 @@ of the stack moves to Rust and those pointers become references.
 | `ip4_frag` | 1 | 1 | 0 | The datagram and its fragments' headers |
 | `icmp` | 3 | 3 | 0 | Echo and unreachable messages built in C pbufs |
 | `udp` | 18 | 14 | 0 | PCBs on the list C holds; datagrams in C pbufs; receive callbacks |
+| `dhcp` | 49 | 44 | 0 | Netifs and their `struct dhcp`, which C reads; messages built and parsed in C pbufs |
 | `dns` | 29 | 21 | 0 | Host names and addresses from C callers; the tables found callbacks may re-enter; responses in C pbufs |
 
 `pbuf` and `netif` are the largest: every pbuf and netif is shared with C, which holds raw pointers to

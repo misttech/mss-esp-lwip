@@ -846,6 +846,85 @@ pub struct UdpHdr {
 /// `UDP_HLEN`.
 pub const UDP_HLEN: u16 = 8;
 
+/// `acd_callback_enum_t`: what address conflict detection reports to its client.
+pub type AcdCallback = core::ffi::c_uint;
+/// `ACD_IP_OK`: the address is free to use.
+pub const ACD_IP_OK: AcdCallback = 0;
+/// `ACD_RESTART_CLIENT`: too many conflicts; restart the client after a pause.
+pub const ACD_RESTART_CLIENT: AcdCallback = 1;
+/// `ACD_DECLINE`: the address is in use; decline it.
+pub const ACD_DECLINE: AcdCallback = 2;
+
+/// `acd_conflict_callback_t`.
+pub type AcdConflictCallback = Option<unsafe extern "C" fn(netif: *mut Netif, state: AcdCallback)>;
+
+/// `struct acd`: a client's address conflict detection state, which acd.c (C) owns.
+#[repr(C)]
+pub struct Acd {
+    /// Next acd module for this netif.
+    pub next: *mut Acd,
+    /// The currently selected, probed, announced or used IP-Address.
+    pub ipaddr: Ip4Addr,
+    /// Current ACD state machine state (`acd_state_enum_t`).
+    pub state: core::ffi::c_uint,
+    /// Sent number of probes or announces, dependent on state.
+    pub sent_num: u8,
+    /// Ticks to wait.
+    pub ttw: u16,
+    /// Ticks until a conflict can again be solved by defending.
+    pub lastconflict: u8,
+    /// Total number of probed/used IP-Addresses that resulted in a conflict.
+    pub num_conflicts: u8,
+    /// Callback function -> let's the acd user know if the address is good or if a
+    /// conflict is detected.
+    pub acd_conflict_callback: AcdConflictCallback,
+}
+
+/// `dhcp_timeout_t`: ESP-IDF's 32-bit DHCP timeouts, for long leases.
+pub type DhcpTimeout = u32;
+
+/// `struct dhcp`: a netif's DHCP client state, which C code such as the port reads.
+#[repr(C)]
+pub struct Dhcp {
+    /// Transaction identifier of last sent request.
+    pub xid: u32,
+    /// Track PCB allocation state.
+    pub pcb_allocated: u8,
+    /// Current DHCP state machine state.
+    pub state: u8,
+    /// Retries of current request.
+    pub tries: u8,
+    pub flags: u8,
+    /// ESP-IDF: whether the fine timer is scheduled.
+    pub fine_timer_enabled: u8,
+    /// Ticks with period DHCP_FINE_TIMER_SECS for request timeout.
+    pub request_timeout: DhcpTimeout,
+    /// Ticks with period DHCP_COARSE_TIMER_SECS for renewal time.
+    pub t1_timeout: DhcpTimeout,
+    /// Ticks with period DHCP_COARSE_TIMER_SECS for rebind time.
+    pub t2_timeout: DhcpTimeout,
+    /// Ticks with period DHCP_COARSE_TIMER_SECS until next renew try.
+    pub t1_renew_time: DhcpTimeout,
+    /// Ticks with period DHCP_COARSE_TIMER_SECS until next rebind try.
+    pub t2_rebind_time: DhcpTimeout,
+    /// Ticks with period DHCP_COARSE_TIMER_SECS since last received DHCP ack.
+    pub lease_used: DhcpTimeout,
+    /// Ticks with period DHCP_COARSE_TIMER_SECS for lease time.
+    pub t0_timeout: DhcpTimeout,
+    /// DHCP server address that offered this lease (ip_addr_t because passed to UDP).
+    pub server_ip_addr: IpAddr,
+    pub offered_ip_addr: Ip4Addr,
+    pub offered_sn_mask: Ip4Addr,
+    pub offered_gw_addr: Ip4Addr,
+    /// Lease period (in seconds).
+    pub offered_t0_lease: u32,
+    /// Recommended renew time (usually 50% of lease period).
+    pub offered_t1_renew: u32,
+    /// Recommended rebind time (usually 87.5 of lease period).
+    pub offered_t2_rebind: u32,
+    pub acd: Acd,
+}
+
 /// `sys_timeout_handler`: a function `sys_timeout` calls with its argument.
 pub type SysTimeoutHandler = Option<unsafe extern "C" fn(arg: *mut c_void)>;
 
@@ -906,6 +985,8 @@ pub const UDP_FLAGS_CONNECTED: u8 = 0x04;
 pub const UDP_FLAGS_MULTICAST_LOOP: u8 = 0x08;
 /// `SOF_REUSEADDR`: allow local address reuse.
 pub const SOF_REUSEADDR: u8 = 0x04;
+/// `SOF_BROADCAST`: permit to send and to receive broadcast messages.
+pub const SOF_BROADCAST: u8 = 0x20;
 
 /// `ERR_USE`: address in use.
 pub const ERR_USE: ErrT = -8;
@@ -1076,6 +1157,18 @@ mod layout {
     fp::static_assert!(offset_of!(UdpPcb, mcast_ttl) == UDP_PCB_MCAST_TTL);
     fp::static_assert!(offset_of!(UdpPcb, recv) == UDP_PCB_RECV);
     fp::static_assert!(offset_of!(UdpPcb, recv_arg) == UDP_PCB_RECV_ARG);
+    fp::static_assert!(size_of::<DhcpTimeout>() == SIZEOF_DHCP_TIMEOUT_T);
+    fp::static_assert!(size_of::<Dhcp>() == SIZEOF_STRUCT_DHCP);
+    fp::static_assert!(offset_of!(Dhcp, request_timeout) == DHCP_REQUEST_TIMEOUT);
+    fp::static_assert!(offset_of!(Dhcp, t0_timeout) == DHCP_T0_TIMEOUT);
+    fp::static_assert!(offset_of!(Dhcp, server_ip_addr) == DHCP_SERVER_IP_ADDR);
+    fp::static_assert!(offset_of!(Dhcp, offered_ip_addr) == DHCP_OFFERED_IP_ADDR);
+    fp::static_assert!(offset_of!(Dhcp, offered_t2_rebind) == DHCP_OFFERED_T2_REBIND);
+    fp::static_assert!(offset_of!(Dhcp, acd) == DHCP_ACD);
+    fp::static_assert!(size_of::<Acd>() == SIZEOF_STRUCT_ACD);
+    fp::static_assert!(offset_of!(Acd, state) == ACD_STATE);
+    fp::static_assert!(offset_of!(Acd, ttw) == ACD_TTW);
+    fp::static_assert!(offset_of!(Acd, acd_conflict_callback) == ACD_CONFLICT_CALLBACK);
     fp::static_assert!(size_of::<EthAddr>() == SIZEOF_ETH_ADDR);
     fp::static_assert!(size_of::<EthHdr>() == SIZEOF_STRUCT_ETH_HDR);
     fp::static_assert!(offset_of!(EthHdr, type_) == ETH_HDR_TYPE);

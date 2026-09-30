@@ -39,7 +39,8 @@ set(LWIP_RUST_FILES
     "ip4_frag=core/ipv4/ip4_frag.c"
     "icmp=core/ipv4/icmp.c"
     "udp=core/udp.c"
-    "dns=core/dns.c")
+    "dns=core/dns.c"
+    "dhcp=core/ipv4/dhcp.c")
 
 function(lwip_rust_apply target)
     set(modules ${ARGN})
