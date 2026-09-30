@@ -150,6 +150,7 @@ ported! {
     );
     dns "dns": fn dns_setserver(numdns: u8, dnsserver: *const IpAddr);
     dhcp "dhcp": fn dhcp_network_changed_link_up(netif: *mut Netif);
+    pbuf "pbuf": fn pbuf_cat(head: *mut Pbuf, tail: *mut Pbuf);
     udp "udp": fn udp_bind(pcb: *mut UdpPcb, ipaddr: *const IpAddr, port: u16) -> ErrT;
     udp "udp": fn udp_recv(pcb: *mut UdpPcb, recv: UdpRecvFn, recv_arg: *mut c_void);
     udp "udp": fn udp_remove(pcb: *mut UdpPcb);
@@ -193,6 +194,18 @@ c_only! {
         netif: *mut Netif,
     ) -> ErrT;
     fn icmp6_dest_unreach(p: *mut Pbuf, c: core::ffi::c_uint);
+    fn tcp_eff_send_mss_netif(sendmss: u16, outif: *mut Netif, dest: *const IpAddr) -> u16;
+    fn tcp_seg_free(seg: *mut TcpSeg);
+    fn tcp_segs_free(seg: *mut TcpSeg);
+    fn ip6_output_if(
+        p: *mut Pbuf,
+        src: *const Ip6Addr,
+        dest: *const Ip6Addr,
+        hl: u8,
+        tc: u8,
+        nexth: u8,
+        netif: *mut Netif,
+    ) -> ErrT;
     fn tcp_input(p: *mut Pbuf, inp: *mut Netif);
     fn igmp_input(p: *mut Pbuf, inp: *mut Netif, dest: *const Ip4Addr);
     fn igmp_lookfor_group(ifp: *mut Netif, addr: *const Ip4Addr) -> *mut c_void;
@@ -359,4 +372,25 @@ pub(crate) unsafe fn lwip_strnicmp(str1: *const c_char, str2: *const c_char, len
     // SAFETY: forwarded from the caller.
     let result = unsafe { c_def::lwip_strnicmp(str1, str2, len) };
     result
+}
+
+mod c_tcp {
+    use super::TcpPcb;
+
+    unsafe extern "C" {
+        pub(super) static mut tcp_ticks: u32;
+        pub(super) static mut tcp_input_pcb: *mut TcpPcb;
+    }
+}
+
+/// `tcp_ticks`: tcp.c's slow-timer tick count (tcp.c is C).
+pub(crate) fn tcp_ticks() -> u32 {
+    // SAFETY: the stack serializes access to its globals.
+    unsafe { (&raw const c_tcp::tcp_ticks).read() }
+}
+
+/// `tcp_input_pcb`: the PCB tcp_in.c is processing input for (tcp_in.c is C).
+pub(crate) fn tcp_input_pcb() -> *mut TcpPcb {
+    // SAFETY: the stack serializes access to its globals.
+    unsafe { (&raw const c_tcp::tcp_input_pcb).read() }
 }

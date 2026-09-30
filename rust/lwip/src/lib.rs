@@ -26,7 +26,8 @@
         feature = "icmp",
         feature = "udp",
         feature = "dns",
-        feature = "dhcp"
+        feature = "dhcp",
+        feature = "tcp_out"
     )),
     allow(dead_code, unused_imports, unused_macros)
 )]
@@ -74,5 +75,7 @@ pub mod ip4_frag;
 pub mod netif;
 #[cfg(feature = "pbuf")]
 pub mod pbuf;
+#[cfg(feature = "tcp_out")]
+pub mod tcp_out;
 #[cfg(feature = "udp")]
 pub mod udp;

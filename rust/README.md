@@ -37,15 +37,16 @@ count per module.
 | `udp` | `src/core/udp.c` | `udp` |
 | `dhcp` | `src/core/ipv4/dhcp.c` | `dhcp` |
 | `dns` | `src/core/dns.c` | `dns` |
+| `tcp_out` | `src/core/tcp_out.c` | `tcp_out` |
 
 `mem` and `memp` are ported for the configuration ESP-IDF uses, where lwIP's heap
 is the C library's allocator and each pool allocates from it; `build.rs`
 refuses lwIP's own heap and static pools. `memp.rs`'s pool descriptors are
 generated from the configuration's `memp_std.h`, as `memp.c` declares them.
-`netif`, `ethernet`, `etharp`, `ip4`, `ip4_frag`, `icmp`, `udp`, `dns`, and
-`dhcp` are ported as ESP-IDF configures them; `build.rs` lists the options each
-requires and refuses a configuration that selects code they do not port. A
-module calls a neighbor that is still C through the C symbol
+`netif`, `ethernet`, `etharp`, `ip4`, `ip4_frag`, `icmp`, `udp`, `dns`, `dhcp`,
+and `tcp_out` are ported as ESP-IDF configures them; `build.rs` lists the
+options each requires and refuses a configuration that selects code they do not
+port. A module calls a neighbor that is still C through the C symbol
 (`lwip/src/links.rs`), so any subset can be built.
 
 ## Configuration
@@ -69,7 +70,7 @@ Make a component directory named `lwip` that overrides ESP-IDF's (through
   links to ESP-IDF's `components/lwip` entries.
 
 Then configure the project with
-`-DLWIP_RUST_MODULES="def;inet_chksum;ip4_addr;mem;memp;pbuf;netif;ethernet;etharp;ip4;ip4_frag;icmp;udp;dns;dhcp"`
+`-DLWIP_RUST_MODULES="def;inet_chksum;ip4_addr;mem;memp;pbuf;netif;ethernet;etharp;ip4;ip4_frag;icmp;udp;dns;dhcp;tcp_out"`
 and, if cargo is not on `PATH`, `-DLWIP_RUST_CARGO=<cargo>`. The Rust target is
 `riscv32imafc-unknown-none-elf` (`rv32imafc`, `ilp32f`); set `LWIP_RUST_TARGET`
 for another.

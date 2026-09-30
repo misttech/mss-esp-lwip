@@ -9,11 +9,11 @@ of the stack moves to Rust and those pointers become references.
 | Module | `unsafe` blocks | `unsafe fn` | `unsafe impl` | What it covers |
 |---|---:|---:|---:|---|
 | `cstr` | 2 | 3 | 0 | Reading C strings of unknown length |
-| `types` | 7 | 15 | 0 | Pbuf payloads and chains; the `ip_addr_t` union; C callback types |
+| `types` | 7 | 21 | 0 | Pbuf payloads and chains; the `ip_addr_t` union; C callback types |
 | `platform` | 1 | 0 | 0 | Calling the C library's `__assert_func` |
 | `sys` | 2 | 0 | 0 | The port's critical section |
 | `global` | 2 | 0 | 1 | lwIP's global variables, laid out as C's |
-| `links` | 13 | 4 | 0 | Calls between modules, Rust or C (the macros expand to one wrapper per function) |
+| `links` | 15 | 4 | 0 | Calls between modules, Rust or C (the macros expand to one wrapper per function) |
 | `def` | 12 | 10 | 0 | The C string functions' pointer arguments |
 | `inet_chksum` | 19 | 12 | 0 | Buffers and pbuf chains from C callers |
 | `ip4_addr` | 10 | 6 | 1 | C strings and buffers; `ip4addr_ntoa`'s static buffer |
@@ -28,6 +28,7 @@ of the stack moves to Rust and those pointers become references.
 | `icmp` | 3 | 3 | 0 | Echo and unreachable messages built in C pbufs |
 | `udp` | 18 | 14 | 0 | PCBs on the list C holds; datagrams in C pbufs; receive callbacks |
 | `dhcp` | 49 | 44 | 0 | Netifs and their `struct dhcp`, which C reads; messages built and parsed in C pbufs |
+| `tcp_out` | 36 | 36 | 0 | PCBs and segment queues C shares; headers built in C pbufs |
 | `dns` | 29 | 21 | 0 | Host names and addresses from C callers; the tables found callbacks may re-enter; responses in C pbufs |
 
 `pbuf` and `netif` are the largest: every pbuf and netif is shared with C, which holds raw pointers to
