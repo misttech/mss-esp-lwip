@@ -55,6 +55,9 @@
 #include "lwip/dhcp.h"
 #include "lwip/prot/dhcp.h"
 #include "lwip/acd.h"
+#include "lwip/igmp.h"
+#include "lwip/nd6.h"
+#include "lwip/dhcp6.h"
 /* The port's hooks, as the lwIP sources include them. */
 #ifdef LWIP_HOOK_FILENAME
 #include LWIP_HOOK_FILENAME
@@ -64,6 +67,22 @@
   __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(value)))
 
 #define DEFINED(name, macro_defined) ENTRY(name, macro_defined)
+
+/* Whether a function-like macro expands to anything: 1 unless it is empty. An empty
+ * macro argument is C99, which a C90-strict build warns about here only. */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wc90-c99-compat"
+#elif defined(__clang__)
+#pragma clang diagnostic ignored "-Wpedantic"
+#endif
+#define EXPANSION_(x) #x
+#define EXPANSION(x) EXPANSION_(x)
+#define NOT_EMPTY(macro_call) (sizeof(EXPANSION(macro_call)) > 1)
+
+/* One entry of timeouts.c's lwip_cyclic_timers, in its order: the handler's name and its
+ * interval. */
+#define CYCLIC(handler, interval) ENTRY(CYCLIC_TIMER_##handler, interval)
 
 /* A string: a line
  *   @@lwipstr NAME TEXT
@@ -536,7 +555,68 @@ void lwip_rust_config(void)
   ENTRY(TCP_HOOKS, 0);
 #endif
 
+  /* timeouts.c. */
+  SWITCH(LWIP_TIMERS);
+  SWITCH(LWIP_TIMERS_CUSTOM);
+  SWITCH(LWIP_DEBUG_TIMERNAMES);
+  ENTRY(TCP_TMR_INTERVAL, TCP_TMR_INTERVAL);
+  /* Hooks the ported modules do not port: each must expand to nothing. */
+  ENTRY(LWIP_ASSERT_CORE_LOCKED_DEFINED, NOT_EMPTY(LWIP_ASSERT_CORE_LOCKED()));
+  ENTRY(LWIP_TCPIP_THREAD_ALIVE_DEFINED, NOT_EMPTY(LWIP_TCPIP_THREAD_ALIVE()));
+  ENTRY(PBUF_CHECK_FREE_OOSEQ_DEFINED, NOT_EMPTY(PBUF_CHECK_FREE_OOSEQ()));
+  /* lwip_cyclic_timers, as timeouts.c lists it. */
+#if LWIP_TCP
+  CYCLIC(tcp_tmr, TCP_TMR_INTERVAL);
+#endif
+#if LWIP_IPV4
+#if IP_REASSEMBLY && !ESP_LWIP_IP4_REASSEMBLY_TIMERS_ONDEMAND
+  CYCLIC(ip_reass_tmr, IP_TMR_INTERVAL);
+#endif
+#if LWIP_ARP
+  CYCLIC(etharp_tmr, ARP_TMR_INTERVAL);
+#endif
+#if LWIP_DHCP
+  CYCLIC(dhcp_coarse_tmr, DHCP_COARSE_TIMER_MSECS);
+#endif
+#if LWIP_DHCP && !ESP_LWIP_DHCP_FINE_TIMERS_ONDEMAND
+  CYCLIC(dhcp_fine_tmr, DHCP_FINE_TIMER_MSECS);
+#endif
+#if LWIP_ACD && !DHCP_DOES_ARP_CHECK
+  CYCLIC(acd_tmr, ACD_TMR_INTERVAL);
+#endif
+#if LWIP_IGMP && !ESP_LWIP_IGMP_TIMERS_ONDEMAND
+  CYCLIC(igmp_tmr, IGMP_TMR_INTERVAL);
+#endif
+#endif
+#if LWIP_DNS && !ESP_LWIP_DNS_TIMERS_ONDEMAND
+  CYCLIC(dns_tmr, DNS_TMR_INTERVAL);
+#endif
+#if LWIP_IPV6
+#if LWIP_ND6
+  CYCLIC(nd6_tmr, ND6_TMR_INTERVAL);
+#endif
+#if LWIP_IPV6_REASS && !ESP_LWIP_IP6_REASSEMBLY_TIMERS_ONDEMAND
+  CYCLIC(ip6_reass_tmr, IP6_REASS_TMR_INTERVAL);
+#endif
+#if LWIP_IPV6_MLD && !ESP_LWIP_MLD6_TIMERS_ONDEMAND
+  CYCLIC(mld6_tmr, MLD6_TMR_INTERVAL);
+#endif
+#if LWIP_IPV6_DHCP6
+  CYCLIC(dhcp6_tmr, DHCP6_TIMER_MSECS);
+#endif
+#endif
+
   /* Layouts. */
+#if LWIP_TIMERS
+  ENTRY(SIZEOF_SYS_TIMEO, sizeof(struct sys_timeo));
+  ENTRY(SYS_TIMEO_NEXT, offsetof(struct sys_timeo, next));
+  ENTRY(SYS_TIMEO_TIME, offsetof(struct sys_timeo, time));
+  ENTRY(SYS_TIMEO_H, offsetof(struct sys_timeo, h));
+  ENTRY(SYS_TIMEO_ARG, offsetof(struct sys_timeo, arg));
+#endif
+  ENTRY(SIZEOF_LWIP_CYCLIC_TIMER, sizeof(struct lwip_cyclic_timer));
+  ENTRY(LWIP_CYCLIC_TIMER_INTERVAL_MS, offsetof(struct lwip_cyclic_timer, interval_ms));
+  ENTRY(LWIP_CYCLIC_TIMER_HANDLER, offsetof(struct lwip_cyclic_timer, handler));
   ENTRY(SIZEOF_POINTER, sizeof(void *));
   ENTRY(SIZEOF_PBUF, sizeof(struct pbuf));
   ENTRY(ALIGNOF_PBUF, __alignof__(struct pbuf));

@@ -220,6 +220,10 @@ ported! {
     ) -> ErrT;
     etharp "etharp": fn etharp_input(p: *mut Pbuf, netif: *mut Netif);
     etharp "etharp": fn etharp_cleanup_netif(netif: *mut Netif);
+    tcp "tcp": fn tcp_tmr();
+    timeouts "timeouts": fn sys_timeout(msecs: u32, handler: SysTimeoutHandler, arg: *mut c_void);
+    timeouts "timeouts": fn sys_untimeout(handler: SysTimeoutHandler, arg: *mut c_void);
+    timeouts "timeouts": fn tcp_timer_needed();
 }
 
 c_only! {
@@ -228,8 +232,6 @@ c_only! {
     fn ip4_route_src_hook(src: *const Ip4Addr, dest: *const Ip4Addr) -> *mut Netif;
     fn raw_input(p: *mut Pbuf, inp: *mut Netif) -> RawInputState;
     fn esp_random() -> u32;
-    fn sys_timeout(msecs: u32, handler: SysTimeoutHandler, arg: *mut c_void);
-    fn sys_untimeout(handler: SysTimeoutHandler, arg: *mut c_void);
     fn ipaddr_aton(cp: *const c_char, addr: *mut IpAddr) -> c_int;
     fn ip6_route(src: *const Ip6Addr, dest: *const Ip6Addr) -> *mut Netif;
     fn ip6_select_source_address(netif: *mut Netif, dest: *const Ip6Addr) -> *const IpAddr;
@@ -243,7 +245,6 @@ c_only! {
         netif: *mut Netif,
     ) -> ErrT;
     fn icmp6_dest_unreach(p: *mut Pbuf, c: core::ffi::c_uint);
-    fn tcp_timer_needed();
     fn nd6_reachability_hint(ip6addr: *const Ip6Addr);
     fn lwip_hook_tcp_isn(local_ip: *const IpAddr, local_port: u16, remote_ip: *const IpAddr, remote_port: u16) -> u32;
     fn nd6_get_destination_mtu(ip6addr: *const Ip6Addr, netif: *mut Netif) -> u16;

@@ -147,22 +147,55 @@ no_ops! {
     fn icmp6_dest_unreach(p: *mut Pbuf, c: core::ffi::c_uint);
 }
 
-/// The timeouts `sys_timeout` set and `sys_untimeout` has not cleared: handler and
-/// argument, as addresses.
-pub(crate) static TIMEOUTS: Mutex<std::vec::Vec<(usize, usize)>> = Mutex::new(std::vec::Vec::new());
+/// The timeouts `sys_timeout` set and `sys_untimeout` has not cleared, while timeouts.c
+/// is C: handler and argument, as addresses.
+#[cfg(not(feature = "timeouts"))]
+static TIMEOUTS: Mutex<std::vec::Vec<(usize, usize)>> = Mutex::new(std::vec::Vec::new());
 
 /// `sys_timeout`: recorded, not run; a test fires a timer by calling its function.
+#[cfg(not(feature = "timeouts"))]
 #[unsafe(no_mangle)]
 extern "C" fn sys_timeout(_msecs: u32, handler: crate::types::SysTimeoutHandler, arg: *mut c_void) {
     let entry = (handler.map_or(0, |h| h as usize), arg as usize);
     TIMEOUTS.lock().unwrap().push(entry);
 }
 
+#[cfg(not(feature = "timeouts"))]
 #[unsafe(no_mangle)]
 extern "C" fn sys_untimeout(handler: crate::types::SysTimeoutHandler, arg: *mut c_void) {
     let entry = (handler.map_or(0, |h| h as usize), arg as usize);
     TIMEOUTS.lock().unwrap().retain(|&e| e != entry);
 }
+
+/// The pending timeouts, in the order they are due: handler and argument, as addresses.
+pub(crate) fn timeouts() -> std::vec::Vec<(usize, usize)> {
+    #[cfg(feature = "timeouts")]
+    let pending = crate::timeouts::pending();
+    #[cfg(not(feature = "timeouts"))]
+    let pending = TIMEOUTS.lock().unwrap().clone();
+    pending
+}
+
+/// Drop every pending timeout, as a fresh stack has none.
+pub(crate) fn clear_timeouts() {
+    #[cfg(feature = "timeouts")]
+    crate::timeouts::reset();
+    #[cfg(not(feature = "timeouts"))]
+    TIMEOUTS.lock().unwrap().clear();
+}
+
+/// The port's millisecond clock, which a test sets.
+pub(crate) static NOW: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+/// `sys_now`: the port's clock, as a test set it.
+#[unsafe(no_mangle)]
+extern "C" fn sys_now() -> u32 {
+    NOW.load(Relaxed)
+}
+
+/// nd6.c's cyclic timer: nothing to do.
+#[unsafe(no_mangle)]
+extern "C" fn nd6_tmr() {}
 
 /// `ipaddr_aton`: ip.c's, for IPv4 dotted addresses, which is all the tests pass it.
 #[unsafe(no_mangle)]
@@ -242,6 +275,7 @@ extern "C" fn dhcp_append_extra_opts(
 /// Times TCP asked for its timer (timeouts.c's `tcp_timer_needed`).
 pub(crate) static TCP_TIMER_NEEDED: AtomicUsize = AtomicUsize::new(0);
 
+#[cfg(not(feature = "timeouts"))]
 #[unsafe(no_mangle)]
 extern "C" fn tcp_timer_needed() {
     TCP_TIMER_NEEDED.fetch_add(1, Relaxed);
