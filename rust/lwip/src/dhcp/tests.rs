@@ -639,3 +639,39 @@ fn the_backoff_and_timeouts_follow_esp_idf() {
     assert_eq!(fine_ticks(500), 1);
     assert_eq!(fine_ticks(501), 2);
 }
+
+#[test]
+fn a_message_the_options_fill_goes_out_without_the_end_marker() {
+    let _serial = serial();
+    // SAFETY: a fresh pbuf the size of a message, freed below.
+    unsafe {
+        let p = pbuf_alloc(
+            config::PBUF_TRANSPORT_LAYER as PbufLayer,
+            SIZEOF_DHCP_MSG as u16,
+            PBUF_RAM,
+        );
+        assert!(!p.is_null());
+        let msg = (*p).payload.cast::<u8>();
+        options(msg).fill(0xaa);
+        // No room is left for DHCP_OPTION_END: C writes it past the message, which the
+        // port does not, and the message keeps its length.
+        dhcp_option_trailer(DHCP_OPTIONS_LEN as u16, msg, p);
+        assert!(options(msg).iter().all(|&b| b == 0xaa));
+        assert_eq!(usize::from((*p).tot_len), SIZEOF_DHCP_MSG);
+
+        // With room, the marker ends the options and the message shrinks to them, padded
+        // to DHCP_MIN_OPTIONS_LEN.
+        dhcp_option_trailer(3, msg, p);
+        assert_eq!(options(msg)[3], DHCP_OPTION_END);
+        assert!(
+            options(msg)[4..usize::from(DHCP_MIN_OPTIONS_LEN)]
+                .iter()
+                .all(|&b| b == 0)
+        );
+        assert_eq!(
+            usize::from((*p).tot_len),
+            SIZEOF_DHCP_MSG - DHCP_OPTIONS_LEN + usize::from(DHCP_MIN_OPTIONS_LEN)
+        );
+        pbuf_free(p);
+    }
+}
