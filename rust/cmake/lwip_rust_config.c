@@ -42,6 +42,9 @@
 #include "lwip/priv/nd6_priv.h"
 #include "lwip/ip6_frag.h"
 #include "lwip/mld6.h"
+#include "netif/ethernet.h"
+#include "lwip/prot/etharp.h"
+#include "lwip/prot/ethernet.h"
 
 #define ENTRY(name, value) \
   __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(value)))
@@ -195,6 +198,52 @@ void lwip_rust_config(void)
   ENTRY(LWIP_DEBUG, 0);
 #endif
 
+  /* netif.c, ethernet.c, and etharp.c. */
+/* An option under its own name: stringified here, before the argument expands. */
+#define SWITCH(name) \
+  __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(name)))
+  SWITCH(ENABLE_LOOPBACK);
+  SWITCH(LWIP_HAVE_LOOPIF);
+  SWITCH(LWIP_NETIF_LOOPBACK_MULTITHREADING);
+  SWITCH(LWIP_LOOPBACK_MAX_PBUFS);
+  SWITCH(LWIP_NETIF_EXT_STATUS_CALLBACK);
+  SWITCH(LWIP_IGMP);
+  SWITCH(LWIP_ACD);
+  SWITCH(LWIP_DHCP);
+  SWITCH(LWIP_UDP);
+  SWITCH(LWIP_RAW);
+  SWITCH(MIB2_STATS);
+  SWITCH(LWIP_NETIF_USE_HINTS);
+  SWITCH(IP_NAPT);
+  SWITCH(LWIP_ARP);
+  SWITCH(LWIP_ETHERNET);
+  SWITCH(ETH_PAD_SIZE);
+  SWITCH(ARP_TABLE_SIZE);
+  SWITCH(ARP_MAXAGE);
+  SWITCH(ARP_QUEUEING);
+  SWITCH(ARP_QUEUE_LEN);
+  SWITCH(ETHARP_SUPPORT_STATIC_ENTRIES);
+  SWITCH(ETHARP_TABLE_MATCH_NETIF);
+  SWITCH(ETHARP_SUPPORT_VLAN);
+  SWITCH(LWIP_AUTOIP);
+  SWITCH(NETIF_NAMESIZE);
+  ENTRY(PBUF_LINK_LAYER, PBUF_LINK);
+  ENTRY(LWIP_NETIF_STATS_DEBUG, LWIP_STATS && (ETHARP_STATS || LINK_STATS || IP_STATS));
+#if LWIP_IPV6
+  SWITCH(LWIP_IPV6_MLD);
+  SWITCH(LWIP_IPV6_AUTOCONFIG);
+  SWITCH(LWIP_IPV6_SEND_ROUTER_SOLICIT);
+  SWITCH(LWIP_IPV6_DHCP6);
+#endif
+  /* Hooks into the ported files, which are not ported: each must be undefined (or 0). */
+#if defined(LWIP_HOOK_UNKNOWN_ETH_PROTOCOL) || defined(LWIP_HOOK_VLAN_CHECK) || \
+    defined(LWIP_HOOK_VLAN_SET) || defined(LWIP_HOOK_ETHARP_GET_GW) || \
+    defined(LWIP_HOOK_NETIF_ADD) || LWIP_ARP_FILTER_NETIF
+  ENTRY(LWIP_NETIF_HOOKS, 1);
+#else
+  ENTRY(LWIP_NETIF_HOOKS, 0);
+#endif
+
   /* Layouts. */
   ENTRY(SIZEOF_POINTER, sizeof(void *));
   ENTRY(SIZEOF_PBUF, sizeof(struct pbuf));
@@ -242,4 +291,56 @@ void lwip_rust_config(void)
   ENTRY(NETIF_HWADDR, offsetof(struct netif, hwaddr));
   ENTRY(NETIF_FLAGS, offsetof(struct netif, flags));
   ENTRY(NETIF_NUM, offsetof(struct netif, num));
+  ENTRY(SIZEOF_NETIF, sizeof(struct netif));
+  ENTRY(ALIGNOF_NETIF, __alignof__(struct netif));
+  ENTRY(NETIF_INPUT, offsetof(struct netif, input));
+  ENTRY(NETIF_LINKOUTPUT, offsetof(struct netif, linkoutput));
+  ENTRY(NETIF_CLIENT_DATA, offsetof(struct netif, client_data));
+#if LWIP_IPV6
+  ENTRY(NETIF_IP6_ADDR, offsetof(struct netif, ip6_addr));
+  ENTRY(NETIF_IP6_ADDR_STATE, offsetof(struct netif, ip6_addr_state));
+  ENTRY(NETIF_OUTPUT_IP6, offsetof(struct netif, output_ip6));
+#if LWIP_IPV6_AUTOCONFIG
+  ENTRY(NETIF_IP6_AUTOCONFIG_ENABLED, offsetof(struct netif, ip6_autoconfig_enabled));
+#endif
+#if LWIP_IPV6_MLD
+  ENTRY(NETIF_MLD_MAC_FILTER, offsetof(struct netif, mld_mac_filter));
+#endif
+#endif
+#if LWIP_IGMP
+  ENTRY(NETIF_IGMP_MAC_FILTER, offsetof(struct netif, igmp_mac_filter));
+#endif
+#if LWIP_ACD
+  ENTRY(NETIF_ACD_LIST, offsetof(struct netif, acd_list));
+#endif
+#if ENABLE_LOOPBACK
+  ENTRY(NETIF_LOOP_FIRST, offsetof(struct netif, loop_first));
+  ENTRY(NETIF_LOOP_LAST, offsetof(struct netif, loop_last));
+#if LWIP_LOOPBACK_MAX_PBUFS
+  ENTRY(NETIF_LOOP_CNT_CURRENT, offsetof(struct netif, loop_cnt_current));
+#endif
+#if LWIP_NETIF_LOOPBACK_MULTITHREADING
+  ENTRY(NETIF_RESCHEDULE_POLL, offsetof(struct netif, reschedule_poll));
+#endif
+#endif
+#if IP_NAPT
+  ENTRY(NETIF_NAPT, offsetof(struct netif, napt));
+#endif
+#if LWIP_NETIF_EXT_STATUS_CALLBACK
+  ENTRY(SIZEOF_NETIF_EXT_CALLBACK, sizeof(netif_ext_callback_t));
+  ENTRY(NETIF_EXT_CALLBACK_NEXT, offsetof(netif_ext_callback_t, next));
+  ENTRY(SIZEOF_NETIF_EXT_CALLBACK_ARGS, sizeof(netif_ext_callback_args_t));
+  ENTRY(SIZEOF_NETIF_NSC_REASON, sizeof(netif_nsc_reason_t));
+#endif
+#if LWIP_ARP && ARP_QUEUEING
+  ENTRY(SIZEOF_ETHARP_Q_ENTRY, sizeof(struct etharp_q_entry));
+  ENTRY(ETHARP_Q_ENTRY_P, offsetof(struct etharp_q_entry, p));
+#endif
+  ENTRY(SIZEOF_ETH_ADDR, sizeof(struct eth_addr));
+  ENTRY(SIZEOF_STRUCT_ETH_HDR, sizeof(struct eth_hdr));
+  ENTRY(ETH_HDR_TYPE, offsetof(struct eth_hdr, type));
+  ENTRY(SIZEOF_STRUCT_ETHARP_HDR, sizeof(struct etharp_hdr));
+  ENTRY(ETHARP_HDR_OPCODE, offsetof(struct etharp_hdr, opcode));
+  ENTRY(ETHARP_HDR_SIPADDR, offsetof(struct etharp_hdr, sipaddr));
+  ENTRY(ETHARP_HDR_DIPADDR, offsetof(struct etharp_hdr, dipaddr));
 }

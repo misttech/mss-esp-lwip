@@ -138,6 +138,10 @@ pub const PBUF_POOL: PbufType = PBUF_ALLOC_FLAG_RX
 /// Indicates this is a custom pbuf: `pbuf_free` calls `pbuf_custom->custom_free_function()`
 /// when the last reference is released (plus custom PBUF_RAM cannot be trimmed).
 pub const PBUF_FLAG_IS_CUSTOM: u8 = 0x02;
+/// Indicates this pbuf was received as link-level broadcast.
+pub const PBUF_FLAG_LLBCAST: u8 = 0x08;
+/// Indicates this pbuf was received as link-level multicast.
+pub const PBUF_FLAG_LLMCAST: u8 = 0x10;
 /// Indicates this pbuf includes a TCP FIN flag.
 pub const PBUF_FLAG_TCP_FIN: u8 = 0x20;
 
@@ -267,7 +271,82 @@ impl IpAddr {
         // SAFETY: as in `ip4`.
         unsafe { &self.u_addr.ip6 }
     }
+
+    /// `ip_2_ip4()`, mutable.
+    pub fn ip4_mut(&mut self) -> &mut Ip4Addr {
+        // SAFETY: as in `ip4`.
+        unsafe { &mut self.u_addr.ip4 }
+    }
+
+    /// `ip_2_ip6()`, mutable.
+    pub fn ip6_mut(&mut self) -> &mut Ip6Addr {
+        // SAFETY: as in `ip4`.
+        unsafe { &mut self.u_addr.ip6 }
+    }
+
+    /// `ip_addr_set_zero_ip4()`: every word and the zone zeroed, typed IPv4.
+    pub fn set_zero_ip4(&mut self) {
+        *self.ip6_mut() = Ip6Addr::default();
+        self.type_ = IPADDR_TYPE_V4;
+    }
+
+    /// `ip_addr_set_zero_ip6()`: every word and the zone zeroed, typed IPv6.
+    pub fn set_zero_ip6(&mut self) {
+        *self.ip6_mut() = Ip6Addr::default();
+        self.type_ = IPADDR_TYPE_V6;
+    }
+
+    /// `ip_addr_copy(dest, src)`: the type and the address; an IPv4 copy clears the other
+    /// IPv6 words and the zone (`ip_clear_no4`).
+    pub fn copy_from(&mut self, src: &IpAddr) {
+        self.type_ = src.type_;
+        if src.is_v6() {
+            *self.ip6_mut() = *src.ip6();
+        } else {
+            self.ip4_mut().addr = src.ip4().addr;
+            let ip6 = self.ip6_mut();
+            ip6.addr[1] = 0;
+            ip6.addr[2] = 0;
+            ip6.addr[3] = 0;
+            #[cfg(lwip_ipv6_scopes)]
+            {
+                ip6.zone = 0;
+            }
+        }
+    }
+
+    /// `ip_addr_copy_from_ip6(dest, src)`: `src`, typed IPv6.
+    pub fn copy_from_ip6(&mut self, src: &Ip6Addr) {
+        *self.ip6_mut() = *src;
+        self.type_ = IPADDR_TYPE_V6;
+    }
 }
+
+/// An address the stack never writes, where C passes `IP4_ADDR_ANY4`.
+#[cfg(all(lwip_ipv4, lwip_ipv6))]
+pub static IP4_ADDR_ANY4: Ip4Addr = Ip4Addr { addr: IPADDR_ANY };
+
+#[cfg(lwip_ipv6)]
+impl Ip6Addr {
+    /// `ip6_addr_islinklocal()`: fe80::/10.
+    pub fn is_link_local(&self) -> bool {
+        self.addr[0] & 0xffc0_0000_u32.to_be() == 0xfe80_0000_u32.to_be()
+    }
+
+    /// `ip6_addr_zoneless_eq()`: the same address, zones aside.
+    pub fn zoneless_eq(&self, other: &Ip6Addr) -> bool {
+        self.addr == other.addr
+    }
+}
+
+/// `IP6_ADDR_INVALID`.
+pub const IP6_ADDR_INVALID: u8 = 0x00;
+/// `IP6_ADDR_TENTATIVE`.
+pub const IP6_ADDR_TENTATIVE: u8 = 0x08;
+/// `IP6_ADDR_VALID`: this bit marks an address as valid (preferred or deprecated).
+pub const IP6_ADDR_VALID: u8 = 0x10;
+/// `IP6_ADDR_TENTATIVE_COUNT_MASK`: 1-7 probes sent.
+pub const IP6_ADDR_TENTATIVE_COUNT_MASK: u8 = 0x07;
 
 #[cfg(all(lwip_ipv4, not(lwip_ipv6)))]
 impl Ip4Addr {
@@ -282,16 +361,68 @@ impl Ip4Addr {
     }
 }
 
-/// A callback in a mirrored struct whose type no ported module uses yet: only its size
-/// and alignment matter.
-pub type OpaqueFn = Option<unsafe extern "C" fn()>;
+/// `ERR_BUF`: buffer error.
+pub const ERR_BUF: ErrT = -2;
+/// `ERR_RTE`: routing problem.
+pub const ERR_RTE: ErrT = -4;
+/// `ERR_IF`: low-level netif error.
+pub const ERR_IF: ErrT = -12;
 
+/// `netif_init_fn`: called by `netif_add()` to initialize a netif.
+pub type NetifInitFn = Option<unsafe extern "C" fn(netif: *mut Netif) -> ErrT>;
+/// `netif_input_fn`: passes a packet up the TCP/IP stack.
+pub type NetifInputFn = Option<unsafe extern "C" fn(p: *mut Pbuf, inp: *mut Netif) -> ErrT>;
+/// `netif_output_fn`: sends an IPv4 packet on the interface.
+#[cfg(lwip_ipv4)]
+pub type NetifOutputFn =
+    Option<unsafe extern "C" fn(netif: *mut Netif, p: *mut Pbuf, ipaddr: *const Ip4Addr) -> ErrT>;
+/// `netif_output_ip6_fn`: sends an IPv6 packet on the interface.
+#[cfg(lwip_ipv6)]
+pub type NetifOutputIp6Fn =
+    Option<unsafe extern "C" fn(netif: *mut Netif, p: *mut Pbuf, ipaddr: *const Ip6Addr) -> ErrT>;
+/// `netif_linkoutput_fn`: sends a raw packet (Ethernet frame) on the interface.
+pub type NetifLinkoutputFn = Option<unsafe extern "C" fn(netif: *mut Netif, p: *mut Pbuf) -> ErrT>;
+/// `netif_status_callback_fn`: called when a netif changes status.
+pub type NetifStatusCallbackFn = Option<unsafe extern "C" fn(netif: *mut Netif)>;
+/// `netif_igmp_mac_filter_fn`: adds or deletes an entry in the IPv4 multicast filter.
+#[cfg(lwip_ipv4)]
+pub type NetifIgmpMacFilterFn = Option<
+    unsafe extern "C" fn(
+        netif: *mut Netif,
+        group: *const Ip4Addr,
+        action: core::ffi::c_uint,
+    ) -> ErrT,
+>;
+/// `netif_mld_mac_filter_fn`: adds or deletes an entry in the IPv6 multicast filter.
+#[cfg(lwip_ipv6)]
+pub type NetifMldMacFilterFn = Option<
+    unsafe extern "C" fn(
+        netif: *mut Netif,
+        group: *const Ip6Addr,
+        action: core::ffi::c_uint,
+    ) -> ErrT,
+>;
+
+/// Whether the netif is up (`NETIF_FLAG_UP`).
+pub const NETIF_FLAG_UP: u8 = 0x01;
 /// `NETIF_FLAG_BROADCAST`: the netif has broadcast capability.
 pub const NETIF_FLAG_BROADCAST: u8 = 0x02;
+/// If set, the interface has an active link (set by the network interface driver).
+pub const NETIF_FLAG_LINK_UP: u8 = 0x04;
+/// If set, the netif is an ethernet device using ARP.
+pub const NETIF_FLAG_ETHARP: u8 = 0x08;
+/// If set, the netif is an ethernet device. It might not use ARP or TCP/IP if it is used
+/// for PPPoE only.
+pub const NETIF_FLAG_ETHERNET: u8 = 0x10;
+/// If set, the netif has IGMP capability.
+pub const NETIF_FLAG_IGMP: u8 = 0x20;
+/// If set, the netif has MLD6 capability.
+pub const NETIF_FLAG_MLD6: u8 = 0x40;
 
-/// Generic data structure used for all lwIP network interfaces (`struct netif`), up to
-/// and including `num`. The fields after it are not mirrored yet: a `Netif` is only ever
-/// reached through a pointer to the C struct, never made or moved by value in firmware.
+/// Generic data structure used for all lwIP network interfaces (`struct netif`).
+///
+/// The fields follow `netif.h` under the options `build.rs` supports; the MIB2
+/// statistics and `netif_hint` fields are not mirrored, which the layout checks enforce.
 #[repr(C)]
 pub struct Netif {
     /// Pointer to next in linked list.
@@ -319,24 +450,24 @@ pub struct Netif {
     #[cfg(all(lwip_ipv6, lwip_ipv6_address_lifetimes))]
     pub ip6_addr_pref_life: [u32; config::LWIP_IPV6_NUM_ADDRESSES],
     /// Called by the network device driver to pass a packet up the TCP/IP stack.
-    pub input: OpaqueFn,
+    pub input: NetifInputFn,
     /// Called by the IP module when it wants to send a packet on the interface.
     #[cfg(lwip_ipv4)]
-    pub output: OpaqueFn,
+    pub output: NetifOutputFn,
     /// Called by `ethernet_output()` when it wants to send a packet on the interface.
-    pub linkoutput: OpaqueFn,
+    pub linkoutput: NetifLinkoutputFn,
     /// Called by the IPv6 module when it wants to send a packet on the interface.
     #[cfg(lwip_ipv6)]
-    pub output_ip6: OpaqueFn,
+    pub output_ip6: NetifOutputIp6Fn,
     /// Called when the netif state is set to up or down.
     #[cfg(lwip_netif_status_callback)]
-    pub status_callback: OpaqueFn,
+    pub status_callback: NetifStatusCallbackFn,
     /// Called when the netif link is set to up or down.
     #[cfg(lwip_netif_link_callback)]
-    pub link_callback: OpaqueFn,
+    pub link_callback: NetifStatusCallbackFn,
     /// Called when the netif has been removed.
     #[cfg(lwip_netif_remove_callback)]
-    pub remove_callback: OpaqueFn,
+    pub remove_callback: NetifStatusCallbackFn,
     /// Set by the device driver; could point to state information for the device.
     pub state: *mut c_void,
     /// Client data slots (`netif_get_client_data`).
@@ -363,6 +494,38 @@ pub struct Netif {
     /// Number of this interface. Used for `if_api` and `netifapi_netif`, as well as for
     /// IPv6 zones.
     pub num: u8,
+    /// Is this netif enabled for IPv6 autoconfiguration.
+    #[cfg(all(lwip_ipv6, lwip_ipv6_autoconfig))]
+    pub ip6_autoconfig_enabled: u8,
+    /// Number of Router Solicitation messages that remain to be sent.
+    #[cfg(all(lwip_ipv6, lwip_ipv6_send_router_solicit))]
+    pub rs_count: u8,
+    /// Called to add or delete an entry in the multicast filter table of the ethernet
+    /// MAC.
+    #[cfg(all(lwip_ipv4, lwip_igmp))]
+    pub igmp_mac_filter: NetifIgmpMacFilterFn,
+    /// Called to add or delete an entry in the IPv6 multicast filter table of the
+    /// ethernet MAC.
+    #[cfg(all(lwip_ipv6, lwip_ipv6_mld))]
+    pub mld_mac_filter: NetifMldMacFilterFn,
+    /// Address conflict detection state (`struct acd *`).
+    #[cfg(lwip_acd)]
+    pub acd_list: *mut c_void,
+    /// List of packets to be queued for ourselves.
+    #[cfg(enable_loopback)]
+    pub loop_first: Option<NonNull<Pbuf>>,
+    /// The last packet queued for ourselves.
+    #[cfg(enable_loopback)]
+    pub loop_last: Option<NonNull<Pbuf>>,
+    /// The pbufs queued for ourselves.
+    #[cfg(all(enable_loopback, lwip_loopback_max_pbufs))]
+    pub loop_cnt_current: u16,
+    /// Used if the original scheduling failed.
+    #[cfg(all(enable_loopback, lwip_netif_loopback_multithreading))]
+    pub reschedule_poll: u8,
+    /// NAPT enabled on this interface.
+    #[cfg(all(lwip_ipv4, ip_napt))]
+    pub napt: u8,
 }
 
 impl Netif {
@@ -377,6 +540,174 @@ impl Netif {
     pub fn ip4_netmask(&self) -> &Ip4Addr {
         self.netmask.ip4()
     }
+
+    /// `netif_ip4_gw()`.
+    #[cfg(lwip_ipv4)]
+    pub fn ip4_gw(&self) -> &Ip4Addr {
+        self.gw.ip4()
+    }
+
+    /// `netif_get_index()`: the netif's index, its number plus one.
+    pub fn index(&self) -> u8 {
+        self.num.wrapping_add(1)
+    }
+}
+
+/// `netif_nsc_reason_t`: why an extended status callback is called (`LWIP_NSC_*`).
+pub type NetifNscReason = u16;
+
+/// `netif_ext_callback_args_t`: the arguments of an extended status callback, by reason.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union NetifExtCallbackArgs {
+    /// `LWIP_NSC_LINK_CHANGED`: 1 when up, 0 when down.
+    pub link_changed: StateChanged,
+    /// `LWIP_NSC_STATUS_CHANGED`: 1 when up, 0 when down.
+    pub status_changed: StateChanged,
+    /// The IPv4 changes.
+    pub ipv4_changed: Ipv4Changed,
+    /// `LWIP_NSC_IPV6_SET`.
+    pub ipv6_set: Ipv6Set,
+    /// `LWIP_NSC_IPV6_ADDR_STATE_CHANGED`.
+    pub ipv6_addr_state_changed: Ipv6AddrStateChanged,
+}
+
+/// `link_changed_s` and `status_changed_s`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct StateChanged {
+    /// 1: up; 0: down.
+    pub state: u8,
+}
+
+/// `ipv4_changed_s`: the old IPv4 settings.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Ipv4Changed {
+    /// Old IPv4 address.
+    pub old_address: *const IpAddr,
+    /// Old netmask.
+    pub old_netmask: *const IpAddr,
+    /// Old gateway.
+    pub old_gw: *const IpAddr,
+}
+
+/// `ipv6_set_s`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Ipv6Set {
+    /// Index of changed IPv6 address.
+    pub addr_index: i8,
+    /// Old IPv6 address.
+    pub old_address: *const IpAddr,
+}
+
+/// `ipv6_addr_state_changed_s`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Ipv6AddrStateChanged {
+    /// Index of affected IPv6 address.
+    pub addr_index: i8,
+    /// Old IPv6 address state.
+    pub old_state: u8,
+    /// Affected IPv6 address.
+    pub address: *const IpAddr,
+}
+
+/// `netif_ext_callback_fn`: an extended netif status callback.
+pub type NetifExtCallbackFn = Option<
+    unsafe extern "C" fn(
+        netif: *mut Netif,
+        reason: NetifNscReason,
+        args: *const NetifExtCallbackArgs,
+    ),
+>;
+
+/// `netif_ext_callback_t`: a registered extended status callback.
+#[repr(C)]
+pub struct NetifExtCallback {
+    /// The function to call.
+    pub callback_fn: NetifExtCallbackFn,
+    /// The next registered callback.
+    pub next: *mut NetifExtCallback,
+}
+
+/// The length of an Ethernet address (`ETH_HWADDR_LEN`).
+pub const ETH_HWADDR_LEN: usize = 6;
+
+/// An Ethernet MAC address (`struct eth_addr`, packed).
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EthAddr {
+    /// The address bytes.
+    pub addr: [u8; ETH_HWADDR_LEN],
+}
+
+/// Ethernet header (`struct eth_hdr`, packed; `ETH_PAD_SIZE` 0).
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct EthHdr {
+    /// Destination address.
+    pub dest: EthAddr,
+    /// Source address.
+    pub src: EthAddr,
+    /// Ethertype, in network byte order.
+    pub type_: u16,
+}
+
+/// `SIZEOF_ETH_HDR`.
+pub const SIZEOF_ETH_HDR: u16 = core::mem::size_of::<EthHdr>() as u16;
+
+/// `ETHTYPE_IP`: Internet protocol v4.
+pub const ETHTYPE_IP: u16 = 0x0800;
+/// `ETHTYPE_ARP`: Address resolution protocol.
+pub const ETHTYPE_ARP: u16 = 0x0806;
+/// `ETHTYPE_IPV6`: Internet protocol v6.
+pub const ETHTYPE_IPV6: u16 = 0x86DD;
+
+/// An IPv4 address that may be only 16-bit aligned (`struct ip4_addr2`, packed): as it is
+/// in an ARP header.
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct Ip4Addr2 {
+    /// The address as two 16-bit halves, in memory order.
+    pub addrw: [u16; 2],
+}
+
+/// The ARP message, see RFC 826 ("Packet format") (`struct etharp_hdr`, packed).
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct EtharpHdr {
+    /// Hardware type.
+    pub hwtype: u16,
+    /// Protocol type.
+    pub proto: u16,
+    /// Hardware address length.
+    pub hwlen: u8,
+    /// Protocol address length.
+    pub protolen: u8,
+    /// Operation.
+    pub opcode: u16,
+    /// Sender hardware address.
+    pub shwaddr: EthAddr,
+    /// Sender protocol address.
+    pub sipaddr: Ip4Addr2,
+    /// Target hardware address.
+    pub dhwaddr: EthAddr,
+    /// Target protocol address.
+    pub dipaddr: Ip4Addr2,
+}
+
+/// `SIZEOF_ETHARP_HDR`.
+pub const SIZEOF_ETHARP_HDR: u16 = core::mem::size_of::<EtharpHdr>() as u16;
+
+/// `struct etharp_q_entry`: a packet queued on an ARP entry.
+#[repr(C)]
+pub struct EtharpQEntry {
+    /// The next queued packet.
+    pub next: *mut EtharpQEntry,
+    /// The packet.
+    pub p: *mut Pbuf,
 }
 
 #[cfg(lwip_layout)]
@@ -426,4 +757,54 @@ mod layout {
     fp::static_assert!(offset_of!(Netif, hwaddr) == NETIF_HWADDR);
     fp::static_assert!(offset_of!(Netif, flags) == NETIF_FLAGS);
     fp::static_assert!(offset_of!(Netif, num) == NETIF_NUM);
+    fp::static_assert!(size_of::<Netif>() == SIZEOF_NETIF);
+    fp::static_assert!(align_of::<Netif>() == ALIGNOF_NETIF);
+    fp::static_assert!(offset_of!(Netif, input) == NETIF_INPUT);
+    fp::static_assert!(offset_of!(Netif, linkoutput) == NETIF_LINKOUTPUT);
+    fp::static_assert!(offset_of!(Netif, client_data) == NETIF_CLIENT_DATA);
+    #[cfg(lwip_ipv6)]
+    fp::static_assert!(offset_of!(Netif, ip6_addr) == NETIF_IP6_ADDR);
+    #[cfg(lwip_ipv6)]
+    fp::static_assert!(offset_of!(Netif, ip6_addr_state) == NETIF_IP6_ADDR_STATE);
+    #[cfg(lwip_ipv6)]
+    fp::static_assert!(offset_of!(Netif, output_ip6) == NETIF_OUTPUT_IP6);
+    #[cfg(all(lwip_ipv6, lwip_ipv6_autoconfig))]
+    fp::static_assert!(offset_of!(Netif, ip6_autoconfig_enabled) == NETIF_IP6_AUTOCONFIG_ENABLED);
+    #[cfg(all(lwip_ipv6, lwip_ipv6_mld))]
+    fp::static_assert!(offset_of!(Netif, mld_mac_filter) == NETIF_MLD_MAC_FILTER);
+    #[cfg(all(lwip_ipv4, lwip_igmp))]
+    fp::static_assert!(offset_of!(Netif, igmp_mac_filter) == NETIF_IGMP_MAC_FILTER);
+    #[cfg(lwip_acd)]
+    fp::static_assert!(offset_of!(Netif, acd_list) == NETIF_ACD_LIST);
+    #[cfg(enable_loopback)]
+    fp::static_assert!(offset_of!(Netif, loop_first) == NETIF_LOOP_FIRST);
+    #[cfg(enable_loopback)]
+    fp::static_assert!(offset_of!(Netif, loop_last) == NETIF_LOOP_LAST);
+    #[cfg(all(enable_loopback, lwip_loopback_max_pbufs))]
+    fp::static_assert!(offset_of!(Netif, loop_cnt_current) == NETIF_LOOP_CNT_CURRENT);
+    #[cfg(all(enable_loopback, lwip_netif_loopback_multithreading))]
+    fp::static_assert!(offset_of!(Netif, reschedule_poll) == NETIF_RESCHEDULE_POLL);
+    #[cfg(all(lwip_ipv4, ip_napt))]
+    fp::static_assert!(offset_of!(Netif, napt) == NETIF_NAPT);
+
+    #[cfg(lwip_netif_ext_status_callback)]
+    fp::static_assert!(size_of::<NetifExtCallback>() == SIZEOF_NETIF_EXT_CALLBACK);
+    #[cfg(lwip_netif_ext_status_callback)]
+    fp::static_assert!(offset_of!(NetifExtCallback, next) == NETIF_EXT_CALLBACK_NEXT);
+    #[cfg(lwip_netif_ext_status_callback)]
+    fp::static_assert!(size_of::<NetifExtCallbackArgs>() == SIZEOF_NETIF_EXT_CALLBACK_ARGS);
+    #[cfg(lwip_netif_ext_status_callback)]
+    fp::static_assert!(size_of::<NetifNscReason>() == SIZEOF_NETIF_NSC_REASON);
+
+    #[cfg(all(lwip_arp, arp_queueing))]
+    fp::static_assert!(size_of::<EtharpQEntry>() == SIZEOF_ETHARP_Q_ENTRY);
+    #[cfg(all(lwip_arp, arp_queueing))]
+    fp::static_assert!(offset_of!(EtharpQEntry, p) == ETHARP_Q_ENTRY_P);
+    fp::static_assert!(size_of::<EthAddr>() == SIZEOF_ETH_ADDR);
+    fp::static_assert!(size_of::<EthHdr>() == SIZEOF_STRUCT_ETH_HDR);
+    fp::static_assert!(offset_of!(EthHdr, type_) == ETH_HDR_TYPE);
+    fp::static_assert!(size_of::<EtharpHdr>() == SIZEOF_STRUCT_ETHARP_HDR);
+    fp::static_assert!(offset_of!(EtharpHdr, opcode) == ETHARP_HDR_OPCODE);
+    fp::static_assert!(offset_of!(EtharpHdr, sipaddr) == ETHARP_HDR_SIPADDR);
+    fp::static_assert!(offset_of!(EtharpHdr, dipaddr) == ETHARP_HDR_DIPADDR);
 }
