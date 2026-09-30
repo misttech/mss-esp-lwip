@@ -17,7 +17,10 @@
         feature = "ip4_addr",
         feature = "mem",
         feature = "memp",
-        feature = "pbuf"
+        feature = "pbuf",
+        feature = "netif",
+        feature = "ethernet",
+        feature = "etharp"
     )),
     allow(dead_code, unused_imports, unused_macros)
 )]
@@ -33,6 +36,7 @@ pub mod types;
 #[macro_use]
 mod platform;
 
+mod global;
 mod links;
 pub mod mem;
 pub mod memp;
@@ -42,9 +46,15 @@ mod test_support;
 
 #[cfg(feature = "def")]
 pub mod def;
+#[cfg(feature = "etharp")]
+pub mod etharp;
+#[cfg(feature = "ethernet")]
+pub mod ethernet;
 #[cfg(feature = "inet_chksum")]
 pub mod inet_chksum;
 #[cfg(all(feature = "ip4_addr", lwip_ipv4))]
 pub mod ip4_addr;
+#[cfg(feature = "netif")]
+pub mod netif;
 #[cfg(feature = "pbuf")]
 pub mod pbuf;
