@@ -3,7 +3,7 @@
 //! A minimal freestanding C library for firmware run under Forkpoint.
 //!
 //! It provides what LVGL, the lwIP Rust port, and compiler-generated code call:
-//! the `string.h` and `ctype.h` functions, `putchar`, `abort`, and the `assert`
+//! the `string.h` and `ctype.h` functions, `putchar`, `abort`, `atoi`, and the `assert`
 //! failure path. The firmware
 //! supplies the two calls a C library makes into its platform, POSIX `write`
 //! and `_exit` (declared in `include/unistd.h`), and its own `printf` and
@@ -19,7 +19,7 @@
 #![no_builtins]
 
 mod assert;
-mod ctype;
+pub(crate) mod ctype;
 mod stdio;
 mod stdlib;
 mod string;
@@ -28,7 +28,7 @@ mod unistd;
 pub use assert::__assert_func;
 pub use ctype::{isdigit, islower, isspace, isupper, isxdigit, tolower, toupper};
 pub use stdio::putchar;
-pub use stdlib::abort;
+pub use stdlib::{abort, atoi};
 pub use string::{
     memcmp, memcpy, memmove, memset, strcat, strchr, strcmp, strcpy, strlen, strncmp, strncpy,
 };
