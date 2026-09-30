@@ -44,10 +44,11 @@ extern "C" fn tcpip_try_callback(
 
 use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
-use crate::types::{ErrT, Ip4Addr, IpAddr, Netif, Pbuf};
+use core::mem::MaybeUninit;
+
+use crate::types::{ErrT, Ip4Addr, IpAddr, IpGlobals, Netif, Pbuf, RAW_INPUT_NONE, RawInputState};
 
 /// Packets the IP layer stand-ins received, by protocol.
-pub(crate) static IP4_INPUTS: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static IP6_INPUTS: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static IP_INPUTS: AtomicUsize = AtomicUsize::new(0);
 
@@ -65,13 +66,6 @@ extern "C" fn ip_input(p: *mut Pbuf, _inp: *mut Netif) -> ErrT {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn ip4_input(p: *mut Pbuf, _inp: *mut Netif) -> ErrT {
-    IP4_INPUTS.fetch_add(1, Relaxed);
-    consume(p);
-    0
-}
-
-#[unsafe(no_mangle)]
 extern "C" fn ip6_input(p: *mut Pbuf, _inp: *mut Netif) -> ErrT {
     IP6_INPUTS.fetch_add(1, Relaxed);
     consume(p);
@@ -84,13 +78,29 @@ extern "C" fn tcpip_input(p: *mut Pbuf, _inp: *mut Netif) -> ErrT {
     0
 }
 
-/// `ip4_route`: every destination goes through the default netif.
+/// `ip_data`, ip.c's state of the packet being delivered: zeroed, as a C global is.
 #[unsafe(no_mangle)]
-extern "C" fn ip4_route(_dest: *const Ip4Addr) -> *mut Netif {
-    #[cfg(feature = "netif")]
-    return crate::netif::netif_default.get();
-    #[cfg(not(feature = "netif"))]
-    core::ptr::null_mut()
+static mut ip_data: MaybeUninit<IpGlobals> = MaybeUninit::zeroed();
+
+/// Packets the protocol stand-ins received.
+pub(crate) static UDP_INPUTS: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static TCP_INPUTS: AtomicUsize = AtomicUsize::new(0);
+
+#[unsafe(no_mangle)]
+extern "C" fn udp_input(p: *mut Pbuf, _inp: *mut Netif) {
+    UDP_INPUTS.fetch_add(1, Relaxed);
+    consume(p);
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn tcp_input(p: *mut Pbuf, _inp: *mut Netif) {
+    TCP_INPUTS.fetch_add(1, Relaxed);
+    consume(p);
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn igmp_input(p: *mut Pbuf, _inp: *mut Netif, _dest: *const Ip4Addr) {
+    consume(p);
 }
 
 /// The protocols a netif change reaches, which host tests do not run.
@@ -122,4 +132,7 @@ no_ops! {
     fn tcp_netif_ip_addr_changed(old: *const IpAddr, new: *const IpAddr);
     fn udp_netif_ip_addr_changed(old: *const IpAddr, new: *const IpAddr);
     fn raw_netif_ip_addr_changed(old: *const IpAddr, new: *const IpAddr);
+    fn raw_input(p: *mut Pbuf, inp: *mut Netif) -> RawInputState = RAW_INPUT_NONE;
+    fn igmp_lookfor_group(ifp: *mut Netif, addr: *const Ip4Addr) -> *mut c_void = core::ptr::null_mut();
+    fn ip4_route_src_hook(src: *const Ip4Addr, dest: *const Ip4Addr) -> *mut Netif = core::ptr::null_mut();
 }

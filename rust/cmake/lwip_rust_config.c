@@ -45,6 +45,12 @@
 #include "netif/ethernet.h"
 #include "lwip/prot/etharp.h"
 #include "lwip/prot/ethernet.h"
+#include "lwip/ip.h"
+#include "lwip/icmp.h"
+#include "lwip/prot/ip4.h"
+#include "lwip/prot/icmp.h"
+#include "lwip/prot/udp.h"
+#include "lwip/priv/raw_priv.h"
 
 #define ENTRY(name, value) \
   __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(value)))
@@ -244,6 +250,55 @@ void lwip_rust_config(void)
   ENTRY(LWIP_NETIF_HOOKS, 0);
 #endif
 
+  /* ip4.c, ip4_frag.c, and icmp.c. */
+  SWITCH(LWIP_ICMP);
+  SWITCH(IP_FORWARD);
+  SWITCH(IP_REASSEMBLY);
+  SWITCH(IP_FRAG);
+  SWITCH(IP_OPTIONS_ALLOWED);
+  SWITCH(IP_OPTIONS_SEND);
+  /* ip4.c's own derived switches, computed as it computes them. */
+#if LWIP_DHCP || defined(LWIP_IP_ACCEPT_UDP_PORT)
+  ENTRY(IP_ACCEPT_LINK_LAYER_ADDRESSING, 1);
+#else
+  ENTRY(IP_ACCEPT_LINK_LAYER_ADDRESSING, 0);
+#endif
+#ifdef LWIP_INLINE_IP_CHKSUM
+  ENTRY(CHECKSUM_GEN_IP_INLINE, LWIP_INLINE_IP_CHKSUM && CHECKSUM_GEN_IP);
+#else
+  ENTRY(CHECKSUM_GEN_IP_INLINE, !LWIP_CHECKSUM_CTRL_PER_NETIF && CHECKSUM_GEN_IP);
+#endif
+  SWITCH(CHECKSUM_GEN_IP);
+  SWITCH(CHECKSUM_CHECK_IP);
+  SWITCH(CHECKSUM_GEN_ICMP);
+  SWITCH(CHECKSUM_CHECK_ICMP);
+  SWITCH(LWIP_BROADCAST_PING);
+  SWITCH(LWIP_MULTICAST_PING);
+  SWITCH(LWIP_MULTICAST_TX_OPTIONS);
+  SWITCH(LWIP_NETIF_LOOPBACK);
+  SWITCH(LWIP_NETIF_TX_SINGLE_PBUF);
+  SWITCH(LWIP_UDPLITE);
+  SWITCH(ICMP_TTL);
+  ENTRY(PBUF_IP_LAYER, PBUF_IP);
+#ifdef LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN
+  ENTRY(LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN_DEFINED, 1);
+#else
+  ENTRY(LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN_DEFINED, 0);
+#endif
+  /* ESP-IDF routes by source through LWIP_HOOK_IP4_ROUTE_SRC; the other IPv4 hooks are
+   * not ported. */
+#ifdef LWIP_HOOK_IP4_ROUTE_SRC
+  ENTRY(LWIP_HOOK_IP4_ROUTE_SRC_DEFINED, 1);
+#else
+  ENTRY(LWIP_HOOK_IP4_ROUTE_SRC_DEFINED, 0);
+#endif
+#if defined(LWIP_HOOK_IP4_ROUTE) || defined(LWIP_HOOK_IP4_INPUT) || \
+    defined(LWIP_HOOK_IP4_CANFORWARD) || defined(LWIP_IP_ACCEPT_UDP_PORT)
+  ENTRY(LWIP_IP4_HOOKS, 1);
+#else
+  ENTRY(LWIP_IP4_HOOKS, 0);
+#endif
+
   /* Layouts. */
   ENTRY(SIZEOF_POINTER, sizeof(void *));
   ENTRY(SIZEOF_PBUF, sizeof(struct pbuf));
@@ -336,6 +391,19 @@ void lwip_rust_config(void)
   ENTRY(SIZEOF_ETHARP_Q_ENTRY, sizeof(struct etharp_q_entry));
   ENTRY(ETHARP_Q_ENTRY_P, offsetof(struct etharp_q_entry, p));
 #endif
+  ENTRY(SIZEOF_IP_GLOBALS, sizeof(struct ip_globals));
+  ENTRY(IP_GLOBALS_CURRENT_INPUT_NETIF, offsetof(struct ip_globals, current_input_netif));
+  ENTRY(IP_GLOBALS_CURRENT_IP4_HEADER, offsetof(struct ip_globals, current_ip4_header));
+  ENTRY(IP_GLOBALS_CURRENT_IP6_HEADER, offsetof(struct ip_globals, current_ip6_header));
+  ENTRY(IP_GLOBALS_CURRENT_IP_HEADER_TOT_LEN, offsetof(struct ip_globals, current_ip_header_tot_len));
+  ENTRY(IP_GLOBALS_CURRENT_IPHDR_SRC, offsetof(struct ip_globals, current_iphdr_src));
+  ENTRY(IP_GLOBALS_CURRENT_IPHDR_DEST, offsetof(struct ip_globals, current_iphdr_dest));
+  ENTRY(SIZEOF_STRUCT_IP_HDR, sizeof(struct ip_hdr));
+  ENTRY(SIZEOF_STRUCT_ICMP_ECHO_HDR, sizeof(struct icmp_echo_hdr));
+  ENTRY(SIZEOF_STRUCT_ICMP_HDR, sizeof(struct icmp_hdr));
+  ENTRY(SIZEOF_STRUCT_UDP_HDR, sizeof(struct udp_hdr));
+  ENTRY(UDP_HDR_DEST, offsetof(struct udp_hdr, dest));
+  ENTRY(SIZEOF_RAW_INPUT_STATE, sizeof(raw_input_state_t));
   ENTRY(SIZEOF_ETH_ADDR, sizeof(struct eth_addr));
   ENTRY(SIZEOF_STRUCT_ETH_HDR, sizeof(struct eth_hdr));
   ENTRY(ETH_HDR_TYPE, offsetof(struct eth_hdr, type));

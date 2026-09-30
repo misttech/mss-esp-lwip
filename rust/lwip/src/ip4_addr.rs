@@ -401,6 +401,23 @@ mod tests {
         }
     }
 
+    /// test/unit/ip4/test_ip4.c: test_ip4addr_aton.
+    #[test]
+    fn test_ip4addr_aton() {
+        let mut ip_addr = Ip4Addr::default();
+        let aton = |s: &CStr, addr: &mut Ip4Addr| {
+            // SAFETY: NUL-terminated; a live address.
+            unsafe { ip4addr_aton(s.as_ptr(), addr) }
+        };
+        assert_eq!(aton(c"192.168.0.1", &mut ip_addr), 1);
+        assert_eq!(aton(c"192.168.0.0001", &mut ip_addr), 1);
+        assert_eq!(aton(c"192.168.0.zzz", &mut ip_addr), 0);
+        assert_eq!(aton(c"192.168.1", &mut ip_addr), 1);
+        assert_eq!(aton(c"192.168.0xd3", &mut ip_addr), 1);
+        assert_eq!(aton(c"192.168.0xz5", &mut ip_addr), 0);
+        assert_eq!(aton(c"192.168.095", &mut ip_addr), 0);
+    }
+
     #[test]
     fn octal_parsing_stops_at_an_eight() {
         // The fix in upstream 2e175a23: "08" is "0" with a trailing "8", not 8.
