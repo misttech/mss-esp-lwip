@@ -222,6 +222,39 @@ pub unsafe extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
     }
 }
 
+/// Finds the first occurrence of `needle` in `haystack`. Returns a pointer to it,
+/// `haystack` itself when `needle` is empty, or null when there is none.
+///
+/// # Safety
+///
+/// `haystack` and `needle` are NUL-terminated strings.
+#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+pub unsafe extern "C" fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char {
+    let mut start = 0;
+    loop {
+        let mut i = 0;
+        loop {
+            // SAFETY: `needle` has not ended before `i`.
+            let wanted = unsafe { *needle.add(i) };
+            if wanted == 0 {
+                // SAFETY: `start` is within `haystack`, through its NUL.
+                return unsafe { haystack.add(start) }.cast_mut();
+            }
+            // SAFETY: `haystack` has not ended before `start + i`: every byte
+            // before it matched a byte of `needle`, which is not NUL.
+            if unsafe { *haystack.add(start + i) } != wanted {
+                break;
+            }
+            i += 1;
+        }
+        // SAFETY: `haystack` has not ended before `start`.
+        if unsafe { *haystack.add(start) } == 0 {
+            return core::ptr::null_mut();
+        }
+        start += 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::ffi::CStr;
@@ -335,5 +368,38 @@ mod tests {
             unsafe { base.add(4) }.cast_mut()
         );
         assert!(unsafe { strchr(base, i32::from(b'z')) }.is_null());
+    }
+
+    #[test]
+    fn strstr_finds_the_first_occurrence() {
+        let s = c"host.local.local";
+        let base = s.as_ptr();
+        assert_eq!(
+            unsafe { strstr(base, c".local".as_ptr()) },
+            unsafe { base.add(4) }.cast_mut()
+        );
+        assert_eq!(unsafe { strstr(base, c"host".as_ptr()) }, base.cast_mut());
+        assert_eq!(
+            unsafe { strstr(base, c"l.local".as_ptr()) },
+            unsafe { base.add(9) }.cast_mut()
+        );
+        // A partial match that fails restarts one byte on.
+        let aab = c"aab".as_ptr();
+        assert_eq!(
+            unsafe { strstr(aab, c"ab".as_ptr()) },
+            unsafe { aab.add(1) }.cast_mut()
+        );
+    }
+
+    #[test]
+    fn strstr_misses_and_an_empty_needle() {
+        let s = c"example.com";
+        let base = s.as_ptr();
+        assert!(unsafe { strstr(base, c".local".as_ptr()) }.is_null());
+        assert!(unsafe { strstr(base, c"example.commerce".as_ptr()) }.is_null());
+        assert!(unsafe { strstr(c"".as_ptr(), c"a".as_ptr()) }.is_null());
+        assert_eq!(unsafe { strstr(base, c"".as_ptr()) }, base.cast_mut());
+        let empty = c"".as_ptr();
+        assert_eq!(unsafe { strstr(empty, c"".as_ptr()) }, empty.cast_mut());
     }
 }
