@@ -29,7 +29,8 @@
         feature = "dhcp",
         feature = "tcp",
         feature = "tcp_in",
-        feature = "tcp_out"
+        feature = "tcp_out",
+        feature = "timeouts"
     )),
     allow(dead_code, unused_imports, unused_macros)
 )]
@@ -84,5 +85,7 @@ pub mod tcp;
 pub mod tcp_in;
 #[cfg(feature = "tcp_out")]
 pub mod tcp_out;
+#[cfg(feature = "timeouts")]
+pub mod timeouts;
 #[cfg(feature = "udp")]
 pub mod udp;

@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use std::vec::Vec;
 
 use super::*;
-use crate::test_support::{ACD, DHCP_EXTRA_OPTS, TIMEOUTS, serial};
+use crate::test_support::{ACD, DHCP_EXTRA_OPTS, clear_timeouts, serial};
 
 mod packets;
 
@@ -56,7 +56,7 @@ fn with_net_test(test: impl FnOnce(*mut Netif)) {
     let _serial = serial();
     TX.lock().unwrap().clear();
     DHCP_EXTRA_OPTS.lock().unwrap().clear();
-    TIMEOUTS.lock().unwrap().clear();
+    clear_timeouts();
     // SAFETY: every field of the mirror is valid zeroed.
     let mut netif: Box<Netif> = Box::new(unsafe { MaybeUninit::zeroed().assume_init() });
     let n = &mut *netif as *mut Netif;
