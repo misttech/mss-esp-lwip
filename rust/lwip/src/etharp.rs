@@ -781,14 +781,13 @@ pub unsafe extern "C" fn etharp_output(
     unsafe {
         let ip = &*ipaddr;
         let mcastaddr;
-        let dest: *const EthAddr;
         // Determine on destination hardware address. Broadcasts and multicasts are
         // special, other IP addresses are looked up in the ARP table.
 
         // Broadcast destination IP address?
-        if ip4_addr_isbroadcast_u32(ip.addr, netif) != 0 {
+        let dest: *const EthAddr = if ip4_addr_isbroadcast_u32(ip.addr, netif) != 0 {
             // Broadcast on Ethernet also.
-            dest = ethbroadcast();
+            ethbroadcast()
         // Multicast destination IP address?
         } else if ip4_addr_ismulticast(ip) {
             // Hash IP multicast address to MAC address.
@@ -797,7 +796,7 @@ pub unsafe extern "C" fn etharp_output(
                 addr: [0x01, 0x00, 0x5e, bytes[1] & 0x7f, bytes[2], bytes[3]],
             };
             // Destination Ethernet address is multicast.
-            dest = &mcastaddr;
+            &mcastaddr
         // Unicast destination IP address?
         } else {
             // Outside local network? If so, this can neither be a global broadcast nor a
@@ -841,7 +840,7 @@ pub unsafe extern "C" fn etharp_output(
             // No stable entry found, use the (slower) query function: queue on
             // destination Ethernet address belonging to ipaddr.
             return etharp_query(netif, dst_addr, q);
-        }
+        };
 
         // Continuation for multicast/broadcast destinations; obtain source Ethernet
         // address of the interface and send the packet.
