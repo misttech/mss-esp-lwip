@@ -20,7 +20,10 @@
         feature = "pbuf",
         feature = "netif",
         feature = "ethernet",
-        feature = "etharp"
+        feature = "etharp",
+        feature = "ip4",
+        feature = "ip4_frag",
+        feature = "icmp"
     )),
     allow(dead_code, unused_imports, unused_macros)
 )]
@@ -50,10 +53,16 @@ pub mod def;
 pub mod etharp;
 #[cfg(feature = "ethernet")]
 pub mod ethernet;
+#[cfg(feature = "icmp")]
+pub mod icmp;
 #[cfg(feature = "inet_chksum")]
 pub mod inet_chksum;
+#[cfg(feature = "ip4")]
+pub mod ip4;
 #[cfg(all(feature = "ip4_addr", lwip_ipv4))]
 pub mod ip4_addr;
+#[cfg(feature = "ip4_frag")]
+pub mod ip4_frag;
 #[cfg(feature = "netif")]
 pub mod netif;
 #[cfg(feature = "pbuf")]

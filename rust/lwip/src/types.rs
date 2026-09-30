@@ -315,6 +315,21 @@ impl IpAddr {
         }
     }
 
+    /// `ip_addr_copy_from_ip4(dest, src)`: the IPv4 address `addr`, the other IPv6 words
+    /// and the zone cleared (`ip_clear_no4`).
+    pub fn copy_from_ip4(&mut self, addr: u32) {
+        self.ip4_mut().addr = addr;
+        self.type_ = IPADDR_TYPE_V4;
+        let ip6 = self.ip6_mut();
+        ip6.addr[1] = 0;
+        ip6.addr[2] = 0;
+        ip6.addr[3] = 0;
+        #[cfg(lwip_ipv6_scopes)]
+        {
+            ip6.zone = 0;
+        }
+    }
+
     /// `ip_addr_copy_from_ip6(dest, src)`: `src`, typed IPv6.
     pub fn copy_from_ip6(&mut self, src: &Ip6Addr) {
         *self.ip6_mut() = *src;
@@ -701,6 +716,120 @@ pub struct EtharpHdr {
 /// `SIZEOF_ETHARP_HDR`.
 pub const SIZEOF_ETHARP_HDR: u16 = core::mem::size_of::<EtharpHdr>() as u16;
 
+/// The IPv4 header (`struct ip_hdr`, packed). Multi-byte fields are in network byte
+/// order, as on the wire.
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct IpHdr {
+    /// Version / header length.
+    pub v_hl: u8,
+    /// Type of service.
+    pub tos: u8,
+    /// Total length.
+    pub len: u16,
+    /// Identification.
+    pub id: u16,
+    /// Fragment offset field.
+    pub offset: u16,
+    /// Time to live.
+    pub ttl: u8,
+    /// Protocol.
+    pub proto: u8,
+    /// Checksum.
+    pub chksum: u16,
+    /// Source IP address (`ip4_addr_p_t`).
+    pub src: u32,
+    /// Destination IP address (`ip4_addr_p_t`).
+    pub dest: u32,
+}
+
+/// `IP_HLEN`: the IPv4 header without options.
+pub const IP_HLEN: u16 = 20;
+/// `IP_HLEN_MAX`: the IPv4 header with all 40 bytes of options.
+pub const IP_HLEN_MAX: u16 = 60;
+/// `IP_MF`: more fragments flag.
+pub const IP_MF: u16 = 0x2000;
+/// `IP_OFFMASK`: mask for fragmenting bits.
+pub const IP_OFFMASK: u16 = 0x1fff;
+
+/// `IP_PROTO_ICMP`.
+pub const IP_PROTO_ICMP: u8 = 1;
+/// `IP_PROTO_IGMP`.
+pub const IP_PROTO_IGMP: u8 = 2;
+/// `IP_PROTO_UDP`.
+pub const IP_PROTO_UDP: u8 = 17;
+/// `IP_PROTO_TCP`.
+pub const IP_PROTO_TCP: u8 = 6;
+
+/// The ICMP echo header (`struct icmp_echo_hdr`, packed).
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct IcmpEchoHdr {
+    /// Message type.
+    pub type_: u8,
+    /// Message code.
+    pub code: u8,
+    /// Checksum, as on the wire.
+    pub chksum: u16,
+    /// Identifier.
+    pub id: u16,
+    /// Sequence number.
+    pub seqno: u16,
+}
+
+/// The generic ICMP header, with the 32 bits after the checksum (`struct icmp_hdr`,
+/// packed).
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct IcmpHdr {
+    /// Message type.
+    pub type_: u8,
+    /// Message code.
+    pub code: u8,
+    /// Checksum, as on the wire.
+    pub chksum: u16,
+    /// Type-specific data.
+    pub data: u32,
+}
+
+/// The offset of the destination port in a UDP header (`struct udp_hdr`: `src`, then
+/// `dest`).
+pub const UDP_HDR_DEST: usize = 2;
+
+/// `raw_input_state_t`: what raw_input did with a packet (a C enum).
+pub type RawInputState = core::ffi::c_uint;
+/// The packet did not match any PCB.
+pub const RAW_INPUT_NONE: RawInputState = 0;
+/// The packet was handed off and delivered to a PCB.
+pub const RAW_INPUT_EATEN: RawInputState = 1;
+/// The packet was only delivered to a PCB (it can still be referenced).
+pub const RAW_INPUT_DELIVERED: RawInputState = 2;
+
+/// `enum icmp_dur_type`: ICMP destination unreachable codes (a C enum).
+pub type IcmpDurType = core::ffi::c_uint;
+/// Protocol unreachable.
+pub const ICMP_DUR_PROTO: IcmpDurType = 2;
+
+/// `struct ip_globals`: the state of the packet `ip_input` is delivering (`ip_data`, in
+/// ip.c).
+#[repr(C)]
+pub struct IpGlobals {
+    /// The interface that accepted the packet for the current callback invocation.
+    pub current_netif: *mut Netif,
+    /// The interface that received the packet for the current callback invocation.
+    pub current_input_netif: *mut Netif,
+    /// Header of the input packet currently being processed.
+    pub current_ip4_header: *const IpHdr,
+    /// Header of the input IPv6 packet currently being processed.
+    pub current_ip6_header: *mut c_void,
+    /// Total header length of the current IP packet.
+    pub current_ip_header_tot_len: u16,
+    /// Source IP address of current_header.
+    pub current_iphdr_src: IpAddr,
+    /// Destination IP address of current_header.
+    pub current_iphdr_dest: IpAddr,
+}
+
 /// `struct etharp_q_entry`: a packet queued on an ARP entry.
 #[repr(C)]
 pub struct EtharpQEntry {
@@ -800,6 +929,22 @@ mod layout {
     fp::static_assert!(size_of::<EtharpQEntry>() == SIZEOF_ETHARP_Q_ENTRY);
     #[cfg(all(lwip_arp, arp_queueing))]
     fp::static_assert!(offset_of!(EtharpQEntry, p) == ETHARP_Q_ENTRY_P);
+    fp::static_assert!(size_of::<IpGlobals>() == SIZEOF_IP_GLOBALS);
+    fp::static_assert!(
+        offset_of!(IpGlobals, current_input_netif) == IP_GLOBALS_CURRENT_INPUT_NETIF
+    );
+    fp::static_assert!(offset_of!(IpGlobals, current_ip4_header) == IP_GLOBALS_CURRENT_IP4_HEADER);
+    fp::static_assert!(offset_of!(IpGlobals, current_ip6_header) == IP_GLOBALS_CURRENT_IP6_HEADER);
+    fp::static_assert!(
+        offset_of!(IpGlobals, current_ip_header_tot_len) == IP_GLOBALS_CURRENT_IP_HEADER_TOT_LEN
+    );
+    fp::static_assert!(offset_of!(IpGlobals, current_iphdr_src) == IP_GLOBALS_CURRENT_IPHDR_SRC);
+    fp::static_assert!(offset_of!(IpGlobals, current_iphdr_dest) == IP_GLOBALS_CURRENT_IPHDR_DEST);
+    fp::static_assert!(size_of::<IpHdr>() == SIZEOF_STRUCT_IP_HDR);
+    fp::static_assert!(size_of::<IcmpEchoHdr>() == SIZEOF_STRUCT_ICMP_ECHO_HDR);
+    fp::static_assert!(size_of::<IcmpHdr>() == SIZEOF_STRUCT_ICMP_HDR);
+    fp::static_assert!(size_of::<RawInputState>() == SIZEOF_RAW_INPUT_STATE);
+    fp::static_assert!(super::UDP_HDR_DEST == crate::config::UDP_HDR_DEST);
     fp::static_assert!(size_of::<EthAddr>() == SIZEOF_ETH_ADDR);
     fp::static_assert!(size_of::<EthHdr>() == SIZEOF_STRUCT_ETH_HDR);
     fp::static_assert!(offset_of!(EthHdr, type_) == ETH_HDR_TYPE);

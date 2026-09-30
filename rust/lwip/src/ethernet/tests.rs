@@ -13,7 +13,7 @@ use std::vec::Vec;
 
 use super::*;
 use crate::config;
-use crate::test_support::{IP4_INPUTS, IP6_INPUTS, serial};
+use crate::test_support::{IP6_INPUTS, serial};
 
 fn new_netif(flags: u8) -> Box<Netif> {
     // SAFETY: every field of the mirror is valid zeroed.
@@ -54,7 +54,7 @@ fn frames_are_dispatched_by_ethertype_and_flagged_by_destination() {
     let _serial = serial();
     let mut netif = new_netif(NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
     let n = &mut *netif as *mut Netif;
-    let (ip4_before, ip6_before) = (IP4_INPUTS.load(Relaxed), IP6_INPUTS.load(Relaxed));
+    let ip6_before = IP6_INPUTS.load(Relaxed);
 
     // SAFETY: fresh frames, given up to ethernet_input, and a live netif.
     unsafe {
@@ -79,7 +79,6 @@ fn frames_are_dispatched_by_ethertype_and_flagged_by_destination() {
         assert_eq!((*p).flags & PBUF_FLAG_LLMCAST, PBUF_FLAG_LLMCAST);
         crate::links::pbuf_free(p);
 
-        assert_eq!(IP4_INPUTS.load(Relaxed) - ip4_before, 2);
         assert_eq!(IP6_INPUTS.load(Relaxed) - ip6_before, 1);
     }
 }
@@ -87,7 +86,6 @@ fn frames_are_dispatched_by_ethertype_and_flagged_by_destination() {
 #[test]
 fn short_unknown_and_unrouted_frames_are_dropped() {
     let _serial = serial();
-    let ip4_before = IP4_INPUTS.load(Relaxed);
     let mut plain = new_netif(NETIF_FLAG_ETHERNET);
     let mut etharp = new_netif(NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
     // SAFETY: fresh frames, given up to ethernet_input, and live netifs.
@@ -112,7 +110,6 @@ fn short_unknown_and_unrouted_frames_are_dropped() {
             ERR_OK
         );
     }
-    assert_eq!(IP4_INPUTS.load(Relaxed), ip4_before);
 }
 
 static SENT: AtomicPtr<Pbuf> = AtomicPtr::new(ptr::null_mut());
