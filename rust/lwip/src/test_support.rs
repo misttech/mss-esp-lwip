@@ -146,7 +146,6 @@ no_ops! {
     fn acd_arp_reply(netif: *mut Netif, hdr: *mut c_void);
     fn acd_netif_ip_addr_changed(netif: *mut Netif, old: *const IpAddr, new: *const IpAddr);
     fn acd_network_changed_link_down(netif: *mut Netif);
-    fn dhcp_network_changed_link_up(netif: *mut Netif);
     fn igmp_start(netif: *mut Netif) -> ErrT = 0;
     fn igmp_stop(netif: *mut Netif) -> ErrT = 0;
     fn igmp_report_groups(netif: *mut Netif);
@@ -196,4 +195,63 @@ extern "C" fn ipaddr_aton(cp: *const core::ffi::c_char, addr: *mut IpAddr) -> co
         }
     }
     1
+}
+
+/// The ACD client the stand-ins last saw: its state (as an address), its callback, and
+/// the address `acd_start` was last asked to check.
+pub(crate) static ACD: Mutex<Option<(usize, crate::types::AcdConflictCallback, u32)>> =
+    Mutex::new(None);
+
+/// `acd_add`: remembers the client, for a test to report to through its callback.
+#[unsafe(no_mangle)]
+extern "C" fn acd_add(
+    _netif: *mut Netif,
+    acd: *mut crate::types::Acd,
+    callback: crate::types::AcdConflictCallback,
+) -> ErrT {
+    *ACD.lock().unwrap() = Some((acd as usize, callback, 0));
+    0
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn acd_remove(_netif: *mut Netif, acd: *mut crate::types::Acd) {
+    let mut client = ACD.lock().unwrap();
+    if client.is_some_and(|(a, _, _)| a == acd as usize) {
+        *client = None;
+    }
+}
+
+/// `acd_start`: records the address; the test decides the outcome, without probes.
+#[unsafe(no_mangle)]
+extern "C" fn acd_start(_netif: *mut Netif, _acd: *mut crate::types::Acd, ipaddr: Ip4Addr) -> ErrT {
+    if let Some(client) = ACD.lock().unwrap().as_mut() {
+        client.2 = ipaddr.addr;
+    }
+    0
+}
+
+/// The options ESP-IDF's parse hook was handed: option and length.
+pub(crate) static DHCP_EXTRA_OPTS: Mutex<std::vec::Vec<(u8, u8)>> =
+    Mutex::new(std::vec::Vec::new());
+
+/// ESP-IDF's DHCP option hooks: parsing records the option; there is nothing to add.
+#[unsafe(no_mangle)]
+extern "C" fn dhcp_parse_extra_opts(
+    _dhcp: *mut crate::types::Dhcp,
+    _state: u8,
+    option: u8,
+    len: u8,
+    _p: *mut Pbuf,
+    _offset: u16,
+) {
+    DHCP_EXTRA_OPTS.lock().unwrap().push((option, len));
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn dhcp_append_extra_opts(
+    _netif: *mut Netif,
+    _state: u8,
+    _msg_out: *mut c_void,
+    _options_out_len: *mut u16,
+) {
 }

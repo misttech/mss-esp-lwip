@@ -125,6 +125,31 @@ ported! {
     udp "udp": fn udp_input(p: *mut Pbuf, inp: *mut Netif);
     udp "udp": fn udp_netif_ip_addr_changed(old_addr: *const IpAddr, new_addr: *const IpAddr);
     udp "udp": fn udp_new_ip_type(type_: u8) -> *mut UdpPcb;
+    udp "udp": fn udp_new() -> *mut UdpPcb;
+    udp "udp": fn udp_connect(pcb: *mut UdpPcb, ipaddr: *const IpAddr, port: u16) -> ErrT;
+    udp "udp": fn udp_sendto_if(
+        pcb: *mut UdpPcb,
+        p: *mut Pbuf,
+        dst_ip: *const IpAddr,
+        dst_port: u16,
+        netif: *mut Netif,
+    ) -> ErrT;
+    udp "udp": fn udp_sendto_if_src(
+        pcb: *mut UdpPcb,
+        p: *mut Pbuf,
+        dst_ip: *const IpAddr,
+        dst_port: u16,
+        netif: *mut Netif,
+        src_ip: *const IpAddr,
+    ) -> ErrT;
+    netif "netif": fn netif_set_addr(
+        netif: *mut Netif,
+        ipaddr: *const Ip4Addr,
+        netmask: *const Ip4Addr,
+        gw: *const Ip4Addr,
+    );
+    dns "dns": fn dns_setserver(numdns: u8, dnsserver: *const IpAddr);
+    dhcp "dhcp": fn dhcp_network_changed_link_up(netif: *mut Netif);
     udp "udp": fn udp_bind(pcb: *mut UdpPcb, ipaddr: *const IpAddr, port: u16) -> ErrT;
     udp "udp": fn udp_recv(pcb: *mut UdpPcb, recv: UdpRecvFn, recv_arg: *mut c_void);
     udp "udp": fn udp_remove(pcb: *mut UdpPcb);
@@ -175,7 +200,11 @@ c_only! {
     fn acd_arp_reply(netif: *mut Netif, hdr: *mut EtharpHdr);
     fn acd_netif_ip_addr_changed(netif: *mut Netif, old_addr: *const IpAddr, new_addr: *const IpAddr);
     fn acd_network_changed_link_down(netif: *mut Netif);
-    fn dhcp_network_changed_link_up(netif: *mut Netif);
+    fn acd_add(netif: *mut Netif, acd: *mut Acd, acd_conflict_callback: AcdConflictCallback) -> ErrT;
+    fn acd_remove(netif: *mut Netif, acd: *mut Acd);
+    fn acd_start(netif: *mut Netif, acd: *mut Acd, ipaddr: Ip4Addr) -> ErrT;
+    fn dhcp_parse_extra_opts(dhcp: *mut Dhcp, state: u8, option: u8, len: u8, p: *mut Pbuf, offset: u16);
+    fn dhcp_append_extra_opts(netif: *mut Netif, state: u8, msg_out: *mut c_void, options_out_len: *mut u16);
     fn igmp_start(netif: *mut Netif) -> ErrT;
     fn igmp_stop(netif: *mut Netif) -> ErrT;
     fn igmp_report_groups(netif: *mut Netif);
