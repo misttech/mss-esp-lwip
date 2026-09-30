@@ -4,9 +4,9 @@ name: rust
 
 on:
   push:
-    paths: ["rust/**", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "src/**", "test/unit/**", ".github/workflows/rust.yml"]
   pull_request:
-    paths: ["rust/**", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "src/**", "test/unit/**", ".github/workflows/rust.yml"]
 
 jobs:
   rust:
@@ -21,3 +21,12 @@ jobs:
       - run: cargo clippy --locked --all-features --all-targets -- -D warnings
       - run: cargo test --locked --all-features
       - run: cargo build --locked -p lwip --all-features --target riscv32imafc-unknown-none-elf --release
+
+  # lwIP's own unit tests, all C and with the Rust modules, must give the same results.
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y check ninja-build
+      - run: rustup toolchain install stable --profile minimal
+      - run: rust/test/unit/run.sh

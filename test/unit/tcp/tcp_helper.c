@@ -7,8 +7,8 @@
 #include "lwip/inet_chksum.h"
 #include "lwip/ip_addr.h"
 
-#if !LWIP_STATS || !TCP_STATS || !MEMP_STATS
-#error "This tests needs TCP- and MEMP-statistics enabled"
+#if !LWIP_STATS || !MEMP_STATS
+#error "This tests needs MEMP-statistics enabled"
 #endif
 
 const ip_addr_t test_local_ip = IPADDR4_INIT_BYTES(192, 168, 1, 1);

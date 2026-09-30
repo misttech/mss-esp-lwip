@@ -50,3 +50,43 @@ pub(crate) fn platform_assert(file: &str, line: u32, func: &str, message: &str) 
         )
     }
 }
+
+/// The panic handler of a host build linked into a C program, such as lwIP's own unit
+/// tests: a failed assertion panics (see `platform_assert`), which reports the message
+/// on standard error and aborts, as the Unix port's `LWIP_PLATFORM_ASSERT` does. A
+/// firmware's is forkpoint-libc's; a host test's is the standard library's.
+#[cfg(all(lwip_export, not(target_os = "none"), not(test)))]
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
+    use core::fmt::Write;
+
+    unsafe extern "C" {
+        fn write(fd: core::ffi::c_int, buf: *const u8, count: usize) -> isize;
+        fn abort() -> !;
+    }
+
+    struct Stderr;
+
+    impl Write for Stderr {
+        fn write_str(&mut self, s: &str) -> core::fmt::Result {
+            // SAFETY: `s` is `s.len()` readable bytes.
+            let written = unsafe { write(2, s.as_ptr(), s.len()) };
+            if written < 0 {
+                Err(core::fmt::Error)
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    // The program is ending: a failed write has nowhere to be reported.
+    let _ = writeln!(Stderr, "{}", info.message());
+    // SAFETY: `abort` takes no arguments and does not return.
+    unsafe { abort() }
+}
+
+/// The unwinding personality the host's prebuilt `core` refers to. This crate is built
+/// with `panic = "abort"`, so nothing unwinds and it is never called.
+#[cfg(all(lwip_export, not(target_os = "none"), not(test)))]
+#[unsafe(no_mangle)]
+extern "C" fn rust_eh_personality() {}

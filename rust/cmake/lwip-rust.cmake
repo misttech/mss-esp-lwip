@@ -101,7 +101,10 @@ function(lwip_rust_apply target)
             "-I$<JOIN:$<REMOVE_DUPLICATES:${includes}>,;-I>"
             "$<TARGET_PROPERTY:${target},COMPILE_OPTIONS>"
             -S "${root}/cmake/lwip_rust_config.c" -o "${config}"
+            -MD -MF "${config}.d" -MT "${config}"
         DEPENDS "${root}/cmake/lwip_rust_config.c"
+        # The headers it reads (lwipopts.h, sdkconfig.h, ...), from the compiler.
+        DEPFILE "${config}.d"
         COMMENT "Reading the lwIP configuration for Rust"
         COMMAND_EXPAND_LISTS
         VERBATIM)

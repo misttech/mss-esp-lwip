@@ -65,6 +65,11 @@
 
 #define DEFINED(name, macro_defined) ENTRY(name, macro_defined)
 
+/* A string: a line
+ *   @@lwipstr NAME TEXT
+ * where TEXT, a C string literal's contents, runs to the end of the line. */
+#define STRING(name, text) __asm__ volatile("\n.ascii \"@@lwipstr " #name " " text "\\n\"")
+
 void lwip_rust_config(void);
 
 void lwip_rust_config(void)
@@ -188,8 +193,40 @@ void lwip_rust_config(void)
   /* Each pool: its memp_t value and its descriptor's size, as memp.c declares them. */
 #define LWIP_MEMPOOL(name, num, size, desc) \
   ENTRY(MEMP_POOL_##name, MEMP_##name); \
-  ENTRY(MEMP_SIZE_##name, LWIP_MEM_ALIGN_SIZE(size));
+  ENTRY(MEMP_SIZE_##name, LWIP_MEM_ALIGN_SIZE(size)); \
+  STRING(MEMP_DESC_##name, desc);
 #include "lwip/priv/memp_std.h"
+  /* Statistics: the heap's and each pool's, which mem.c and memp.c keep; the protocols'
+   * counters are not ported. A pool descriptor names its pool for the statistics. */
+  ENTRY(LWIP_STATS, LWIP_STATS);
+  ENTRY(LWIP_STATS_DISPLAY, LWIP_STATS_DISPLAY);
+#if defined(LWIP_DEBUG) || MEMP_OVERFLOW_CHECK || LWIP_STATS_DISPLAY
+  ENTRY(MEMP_DESC_DESC, offsetof(struct memp_desc, desc));
+#endif
+#if LWIP_STATS
+  ENTRY(SIZEOF_STAT_COUNTER, sizeof(STAT_COUNTER));
+  ENTRY(SIZEOF_STATS_MEM, sizeof(struct stats_mem));
+#if defined(LWIP_DEBUG) || LWIP_STATS_DISPLAY
+  ENTRY(STATS_MEM_NAME, offsetof(struct stats_mem, name));
+#endif
+  ENTRY(STATS_MEM_ERR, offsetof(struct stats_mem, err));
+  ENTRY(STATS_MEM_USED, offsetof(struct stats_mem, used));
+  ENTRY(STATS_MEM_MAX, offsetof(struct stats_mem, max));
+#if MEM_STATS
+  ENTRY(LWIP_STATS_MEM, offsetof(struct stats_, mem));
+#endif
+#if MEMP_STATS
+  ENTRY(MEMP_DESC_STATS, offsetof(struct memp_desc, stats));
+  ENTRY(LWIP_STATS_MEMP, offsetof(struct stats_, memp));
+#endif
+#endif
+  ENTRY(LINK_STATS, LWIP_STATS && LINK_STATS);
+  ENTRY(ETHARP_STATS, LWIP_STATS && ETHARP_STATS);
+  ENTRY(IP_STATS, LWIP_STATS && IP_STATS);
+  ENTRY(IPFRAG_STATS, LWIP_STATS && IPFRAG_STATS);
+  ENTRY(ICMP_STATS, LWIP_STATS && ICMP_STATS);
+  ENTRY(UDP_STATS, LWIP_STATS && UDP_STATS);
+  ENTRY(TCP_STATS, LWIP_STATS && TCP_STATS);
 #if defined(ESP_LWIP) && ESP_LWIP
   ENTRY(ESP_LWIP, 1);
 #else
@@ -203,8 +240,9 @@ void lwip_rust_config(void)
   ENTRY(LWIP_SUPPORT_CUSTOM_PBUF, LWIP_SUPPORT_CUSTOM_PBUF);
   ENTRY(PBUF_POOL_FREE_OOSEQ, LWIP_TCP && TCP_QUEUE_OOSEQ && PBUF_POOL_FREE_OOSEQ);
   ENTRY(NO_SYS, NO_SYS);
+  ENTRY(SYS_LIGHTWEIGHT_PROT, SYS_LIGHTWEIGHT_PROT);
+  ENTRY(LWIP_TESTMODE, LWIP_TESTMODE);
   ENTRY(LWIP_CHECKSUM_ON_COPY, LWIP_CHECKSUM_ON_COPY);
-  ENTRY(PBUF_STATS, LWIP_STATS && (MEMP_STATS || MEM_STATS));
   ENTRY(PBUF_SPLIT_64K, LWIP_TCP && TCP_QUEUE_OOSEQ && LWIP_WND_SCALE);
 #ifdef LWIP_DEBUG
   ENTRY(LWIP_DEBUG, 1);
@@ -213,6 +251,12 @@ void lwip_rust_config(void)
 #endif
 
   /* netif.c, ethernet.c, and etharp.c. */
+  /* ESP-IDF's ARP queue drops the new packet, not the oldest, when it is full. */
+#if defined(ESP_LWIP_ARP) && ESP_LWIP_ARP
+  ENTRY(ESP_LWIP_ARP, 1);
+#else
+  ENTRY(ESP_LWIP_ARP, 0);
+#endif
 /* An option under its own name: stringified here, before the argument expands. */
 #define SWITCH(name) \
   __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(name)))

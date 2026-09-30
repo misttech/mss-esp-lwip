@@ -6,9 +6,11 @@
 #if !LWIP_STATS || !MEM_STATS ||!MEMP_STATS
 #error "This tests needs MEM- and MEMP-statistics enabled"
 #endif
-#if !LWIP_TCP || !TCP_QUEUE_OOSEQ || !LWIP_WND_SCALE
-#error "This test needs TCP OOSEQ queueing and window scaling enabled"
+#if !LWIP_TCP || !TCP_QUEUE_OOSEQ
+#error "This test needs TCP OOSEQ queueing enabled"
 #endif
+/* pbuf_split_64k() exists only with window scaling. */
+#define TEST_PBUF_SPLIT_64K LWIP_WND_SCALE
 
 /* Setups/teardown functions */
 
@@ -25,6 +27,7 @@ pbuf_teardown(void)
 }
 
 
+#if TEST_PBUF_SPLIT_64K
 #define TESTBUFSIZE_1 65535
 #define TESTBUFSIZE_2 65530
 #define TESTBUFSIZE_3 50050
@@ -34,6 +37,7 @@ static u8_t testbuf_2[TESTBUFSIZE_2];
 static u8_t testbuf_2a[TESTBUFSIZE_2];
 static u8_t testbuf_3[TESTBUFSIZE_3];
 static u8_t testbuf_3a[TESTBUFSIZE_3];
+#endif /* TEST_PBUF_SPLIT_64K */
 
 /* Test functions */
 START_TEST(test_pbuf_alloc_zero_pbufs)
@@ -192,6 +196,7 @@ START_TEST(test_pbuf_copy_partial_pbuf)
 }
 END_TEST
 
+#if TEST_PBUF_SPLIT_64K
 START_TEST(test_pbuf_split_64k_on_small_pbufs)
 {
   struct pbuf *p, *rest=NULL;
@@ -261,6 +266,8 @@ END_TEST
  * and returned ERR_OK when writing at beginning of a pbuf
  * in the chain.
  */
+#endif /* TEST_PBUF_SPLIT_64K */
+
 START_TEST(test_pbuf_take_at_edge)
 {
   err_t res;
@@ -350,8 +357,10 @@ pbuf_suite(void)
     TESTFUNC(test_pbuf_copy_zero_pbuf),
     TESTFUNC(test_pbuf_copy_unmatched_chains),
     TESTFUNC(test_pbuf_copy_partial_pbuf),
+#if TEST_PBUF_SPLIT_64K
     TESTFUNC(test_pbuf_split_64k_on_small_pbufs),
     TESTFUNC(test_pbuf_queueing_bigger_than_64k),
+#endif
     TESTFUNC(test_pbuf_take_at_edge),
     TESTFUNC(test_pbuf_get_put_at_edge)
   };

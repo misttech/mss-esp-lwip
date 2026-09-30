@@ -70,7 +70,7 @@ fn ismulticast(addr: u32) -> bool {
 ///
 /// `p` is a live pbuf chain at the ICMP header, `inp` the live netif it arrived on, and
 /// `ip_data` describes the packet; the caller gives up `p`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn icmp_input(p: *mut Pbuf, inp: *mut Netif) {
     let mut p = p;
 
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn icmp_input(p: *mut Pbuf, inp: *mut Netif) {
 /// # Safety
 ///
 /// `p` is a live pbuf chain at an IPv4 header.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn icmp_dest_unreach(p: *mut Pbuf, t: IcmpDurType) {
     // SAFETY: forwarded from the caller.
     unsafe { icmp_send_response(p, ICMP_DUR, t as u8) };

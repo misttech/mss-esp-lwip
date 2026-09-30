@@ -214,11 +214,11 @@ static DNS_SERVERS: Global<[IpAddr; DNS_MAX_SERVERS]> =
     Global::new([IpAddr::v4(0); DNS_MAX_SERVERS]);
 
 /// `dns_mquery_v4group`: 224.0.0.251, the mDNS IPv4 group.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static dns_mquery_v4group: IpAddr = IpAddr::v4(u32::from_be_bytes([224, 0, 0, 251]).to_be());
 
 /// `dns_mquery_v6group`: FF02::FB, the mDNS IPv6 group.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static dns_mquery_v6group: IpAddr = IpAddr {
     u_addr: IpAddrUnion {
         ip6: Ip6Addr {
@@ -265,7 +265,7 @@ fn server_is_any(idx: usize) -> bool {
 ///
 /// With random source ports, the PCBs are allocated per query, and ESP-IDF sets no
 /// fallback server here: there is nothing to do.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn dns_init() {}
 
 /// Initialize one of the DNS servers.
@@ -277,7 +277,7 @@ pub extern "C" fn dns_init() {}
 /// # Safety
 ///
 /// `dnsserver` is null or valid.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dns_setserver(numdns: u8, dnsserver: *const IpAddr) {
     if usize::from(numdns) < DNS_MAX_SERVERS {
         // SAFETY: as the caller guarantees; the server is in the table.
@@ -293,7 +293,7 @@ pub unsafe extern "C" fn dns_setserver(numdns: u8, dnsserver: *const IpAddr) {
 
 /// Remove all entries from the local host-list, calling their callbacks with a null
 /// address.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn dns_clear_cache() {
     for i in 0..DNS_TABLE_SIZE as u8 {
         // SAFETY: an entry of the table; the stack serializes access to it.
@@ -310,7 +310,7 @@ pub extern "C" fn dns_clear_cache() {
 ///
 /// Returns the IP address of DNS server `numdns`, or `IP_ADDR_ANY` if the index is out
 /// of range.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn dns_getserver(numdns: u8) -> *const IpAddr {
     if usize::from(numdns) < DNS_MAX_SERVERS {
         server(usize::from(numdns))
@@ -329,7 +329,7 @@ unsafe extern "C" fn dns_timeout_cb(_arg: *mut c_void) {
 ///
 /// ESP-IDF runs it only while an entry is in use: it re-arms itself until the table is
 /// empty.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn dns_tmr() {
     // SAFETY: the stack's timer calls, serialized with the other entry points.
     unsafe {
@@ -1254,7 +1254,7 @@ unsafe fn dns_enqueue(
 /// # Safety
 ///
 /// `hostname` is null or a C string, and `addr` null or writable.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dns_gethostbyname(
     hostname: *const c_char,
     addr: *mut IpAddr,
@@ -1288,7 +1288,7 @@ fn dns_server_is_set() -> bool {
 /// # Safety
 ///
 /// As `dns_gethostbyname`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dns_gethostbyname_addrtype(
     hostname: *const c_char,
     addr: *mut IpAddr,
@@ -1310,7 +1310,7 @@ pub unsafe extern "C" fn dns_gethostbyname_addrtype(
 ///
 /// `hostname` is null or a C string, and `addr` null or writable for `addr_cnt`
 /// addresses.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn dns_gethostbyname_addrtype_n(
     hostname: *const c_char,
     addr: *mut IpAddr,

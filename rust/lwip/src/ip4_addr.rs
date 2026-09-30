@@ -43,11 +43,11 @@ use crate::types::{
 };
 
 /// Used by `IP4_ADDR_ANY` and `IP_ADDR_BROADCAST` in `ip_addr.h`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static ip_addr_any: IpAddr = IpAddr::v4(IPADDR_ANY);
 
 /// Used by `IP_ADDR_BROADCAST` in `ip_addr.h`.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub static ip_addr_broadcast: IpAddr = IpAddr::v4(IPADDR_BROADCAST);
 
 /// `ip4_addr_net_eq(addr1, addr2, mask)`: whether `addr1` and `addr2` are on the same
@@ -87,7 +87,7 @@ pub fn is_broadcast(addr: u32, netif: &Netif) -> bool {
 /// # Safety
 ///
 /// `netif` is a valid network interface.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4_addr_isbroadcast_u32(addr: u32, netif: *const Netif) -> u8 {
     // SAFETY: valid, per the caller.
     u8::from(is_broadcast(addr, unsafe { &*netif }))
@@ -105,7 +105,7 @@ pub fn netmask_valid(netmask: u32) -> bool {
 /// Checks if a netmask (in network byte order!) is valid.
 ///
 /// Returns 1 if the netmask is valid, 0 if it is not.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub extern "C" fn ip4_addr_netmask_valid(netmask: u32) -> u8 {
     u8::from(netmask_valid(netmask))
 }
@@ -242,7 +242,7 @@ pub unsafe fn aton(cp: *const c_char) -> Option<Ip4Addr> {
 /// # Safety
 ///
 /// `cp` is a NUL-terminated string.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ipaddr_addr(cp: *const c_char) -> u32 {
     // SAFETY: forwarded from the caller.
     unsafe { aton(cp) }.map_or(IPADDR_NONE, |val| val.addr)
@@ -256,7 +256,7 @@ pub unsafe extern "C" fn ipaddr_addr(cp: *const c_char) -> u32 {
 /// # Safety
 ///
 /// `cp` is a NUL-terminated string; `addr` is null or writable.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4addr_aton(cp: *const c_char, addr: *mut Ip4Addr) -> c_int {
     // SAFETY: forwarded from the caller.
     let Some(val) = (unsafe { aton(cp) }) else {
@@ -304,7 +304,7 @@ pub fn ntoa(addr: &Ip4Addr, buf: &mut [u8]) -> Option<()> {
 /// # Safety
 ///
 /// `addr` is valid; `buf` is writable for `buflen` bytes.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4addr_ntoa_r(
     addr: *const Ip4Addr,
     buf: *mut c_char,
@@ -341,7 +341,7 @@ static NTOA_BUFFER: NtoaBuffer = NtoaBuffer(UnsafeCell::new([0; IP4ADDR_STRLEN_M
 /// # Safety
 ///
 /// `addr` is valid, and no other call uses the static buffer at the same time.
-#[cfg_attr(target_os = "none", unsafe(no_mangle))]
+#[cfg_attr(lwip_export, unsafe(no_mangle))]
 pub unsafe extern "C" fn ip4addr_ntoa(addr: *const Ip4Addr) -> *mut c_char {
     // SAFETY: forwarded from the caller; the buffer is IP4ADDR_STRLEN_MAX bytes.
     unsafe {
