@@ -730,7 +730,7 @@ START_TEST(test_tcp_recv_ooseq_max_pbufs)
   /* create and initialize the pcb */
   pcb = test_tcp_new_counters_pcb(&counters);
   EXPECT_RET(pcb != NULL);
-  tcp_set_state(pcb, ESTABLISHED, &local_ip, &remote_ip, TEST_LOCAL_PORT, TEST_REMOTE_PORT);
+  tcp_set_state(pcb, ESTABLISHED, &test_local_ip, &test_remote_ip, TEST_LOCAL_PORT, TEST_REMOTE_PORT);
   pcb->rcv_nxt = 0x8000;
 
   /* don't 'recv' the first segment (1 byte) so that all other segments will be ooseq */

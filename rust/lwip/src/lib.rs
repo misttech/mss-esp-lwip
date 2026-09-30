@@ -28,6 +28,7 @@
         feature = "dns",
         feature = "dhcp",
         feature = "tcp",
+        feature = "tcp_in",
         feature = "tcp_out"
     )),
     allow(dead_code, unused_imports, unused_macros)
@@ -79,6 +80,8 @@ pub mod netif;
 pub mod pbuf;
 #[cfg(feature = "tcp")]
 pub mod tcp;
+#[cfg(feature = "tcp_in")]
+pub mod tcp_in;
 #[cfg(feature = "tcp_out")]
 pub mod tcp_out;
 #[cfg(feature = "udp")]

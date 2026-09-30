@@ -40,6 +40,7 @@ count per module.
 | `dns` | `src/core/dns.c` | `dns` |
 | `tcp` | `src/core/tcp.c` | `tcp` |
 | `tcp_out` | `src/core/tcp_out.c` | `tcp_out` |
+| `tcp_in` | `src/core/tcp_in.c` | `tcp_in` |
 
 `mem` and `memp` are ported for the configuration ESP-IDF uses, where lwIP's heap
 is the C library's allocator and each pool allocates from it; `build.rs`
@@ -49,7 +50,7 @@ With `MEM_STATS` and `MEMP_STATS`, both keep their statistics in `lwip_stats`
 as the C files do; no module counts the protocols' statistics, and `build.rs`
 refuses a configuration that has a ported module count them.
 `netif`, `ethernet`, `etharp`, `ip4`, `ip4_frag`, `icmp`, `udp`, `dns`, `dhcp`,
-`tcp`, and `tcp_out` are ported as ESP-IDF configures them; `build.rs` lists the
+`tcp`, `tcp_out`, and `tcp_in` are ported as ESP-IDF configures them; `build.rs` lists the
 options each requires and refuses a configuration that selects code they do not
 port. A module calls a neighbor that is still C through the C symbol
 (`lwip/src/links.rs`), so any subset can be built.
@@ -75,7 +76,7 @@ Make a component directory named `lwip` that overrides ESP-IDF's (through
   links to ESP-IDF's `components/lwip` entries.
 
 Then configure the project with
-`-DLWIP_RUST_MODULES="def;inet_chksum;ip4_addr;mem;memp;pbuf;netif;ethernet;etharp;ip4;ip4_frag;icmp;udp;dns;dhcp;tcp;tcp_out"`
+`-DLWIP_RUST_MODULES="def;inet_chksum;ip4_addr;mem;memp;pbuf;netif;ethernet;etharp;ip4;ip4_frag;icmp;udp;dns;dhcp;tcp;tcp_out;tcp_in"`
 and, if cargo is not on `PATH`, `-DLWIP_RUST_CARGO=<cargo>`. The Rust target is
 `riscv32imafc-unknown-none-elf` (`rv32imafc`, `ilp32f`); set `LWIP_RUST_TARGET`
 for another.
@@ -118,7 +119,9 @@ checking: `test_pbuf.c`'s 64 KiB split tests are left out without window
 scaling, and `test_ip4.c`'s reassembly test without reassembly; files that
 required protocol statistics they never read no longer do; the leak check
 leaves out the heap that skipped pools hold when pools allocate from the heap;
-and `esp_platform_hooks.c` builds with `LWIP_NETIF_HOSTNAME`.
+`esp_platform_hooks.c` builds with `LWIP_NETIF_HOSTNAME`; and `test_tcp_oos.c`'s
+out-of-sequence pbuf limit test, which lwIP's own test options leave out, builds
+again.
 
 The script needs cmake, ninja, a C compiler, cargo, and the check library
 (`apt install check`, or `CMAKE_PREFIX_PATH` naming where it is installed).
