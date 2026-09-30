@@ -18,7 +18,7 @@ use crate::ip4::tests::{
     LINKOUTPUT_CTR, LINKOUTPUT_PKT, TEST_IPADDR, arpless_output, ip_header, ip4, packet,
     with_test_netif,
 };
-use crate::test_support::TIMEOUTS;
+use crate::test_support::{clear_timeouts, timeouts};
 
 const SERVER: Ip4Addr = ip4(192, 168, 0, 2);
 const BACKUP: Ip4Addr = ip4(192, 168, 0, 3);
@@ -69,8 +69,18 @@ fn reset() {
     // SAFETY: every field of a request is valid zeroed.
     unsafe { ptr::write_bytes(DNS_REQUESTS.as_ptr(), 0, 1) };
     S_IS_TMR_START.set(false);
-    TIMEOUTS.lock().unwrap().clear();
+    clear_timeouts();
     found();
+}
+
+/// Fire the resolver's timer as its timeout expiring would: the pending timeout goes,
+/// then the timer runs.
+fn tick() {
+    // SAFETY: the resolver's own timeout, with its null argument.
+    unsafe {
+        sys_untimeout(Some(dns_timeout_cb), ptr::null_mut());
+        dns_timeout_cb(ptr::null_mut());
+    }
 }
 
 /// The resolver with `SERVER` set, on the test netif, which sends straight to its driver.
@@ -249,7 +259,7 @@ fn a_query_goes_out_and_its_answer_is_reported_and_cached() {
         assert_eq!(query.qtype, DNS_RRTYPE_A, "IPv4 first");
         assert!(found().is_empty());
         // The on-demand timer runs while the query is pending.
-        assert_eq!(TIMEOUTS.lock().unwrap().len(), 1);
+        assert_eq!(timeouts().len(), 1);
 
         respond(
             netif,
@@ -292,14 +302,14 @@ fn an_answer_lives_for_its_ttl() {
             &[(DNS_RRTYPE_A, 2, &EXAMPLE.addr.to_ne_bytes())],
         );
         assert_eq!(found().len(), 1);
-        dns_tmr();
+        tick();
         assert_eq!(
             resolve(c"short.example", &mut addr, LWIP_DNS_ADDRTYPE_IPV4),
             ERR_OK
         );
-        dns_tmr();
+        tick();
         // Expired: the timer stopped with the table empty, and the name is asked again.
-        assert!(TIMEOUTS.lock().unwrap().is_empty());
+        assert!(timeouts().is_empty());
         assert!(!S_IS_TMR_START.get());
         assert_eq!(
             resolve(c"short.example", &mut addr, LWIP_DNS_ADDRTYPE_IPV4),
@@ -432,16 +442,16 @@ fn retries_back_off_then_give_up() {
         );
         // Resent after 1, 1, 2, and 3 more ticks; given up at the 4th retry.
         let mut sends = Vec::new();
-        for tick in 1..=7 {
-            dns_tmr();
-            sends.push((tick, LINKOUTPUT_CTR.load(Relaxed) - sent));
+        for n in 1..=7 {
+            tick();
+            sends.push((n, LINKOUTPUT_CTR.load(Relaxed) - sent));
         }
         assert_eq!(
             sends,
             [(1, 2), (2, 3), (3, 3), (4, 4), (5, 4), (6, 4), (7, 4)]
         );
         assert_eq!(found(), [("silent.example".into(), None)]);
-        assert!(TIMEOUTS.lock().unwrap().is_empty());
+        assert!(timeouts().is_empty());
     });
 }
 
@@ -485,10 +495,10 @@ fn an_error_or_silence_moves_to_the_next_server() {
             ERR_INPROGRESS
         );
         for _ in 0..6 {
-            dns_tmr();
+            tick();
         }
         assert_eq!(last_query().dest, SERVER.addr.to_ne_bytes());
-        dns_tmr();
+        tick();
         assert_eq!(last_query().dest, BACKUP.addr.to_ne_bytes());
         assert!(found().is_empty());
     });
