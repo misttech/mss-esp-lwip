@@ -421,6 +421,33 @@ void lwip_rust_config(void)
   ENTRY(DHCP_ESP_OPTION_HOOKS, 0);
 #endif
 
+  /* tcp.c, tcp_in.c, and tcp_out.c. */
+  SWITCH(LWIP_TCP_TIMESTAMPS);
+  SWITCH(LWIP_WND_SCALE);
+  SWITCH(LWIP_TCP_SACK_OUT);
+  SWITCH(TCP_CHECKSUM_ON_COPY);
+  SWITCH(CHECKSUM_GEN_TCP);
+  SWITCH(CHECKSUM_CHECK_TCP);
+  SWITCH(TCP_OVERSIZE_DBGCHECK);
+  SWITCH(LWIP_TCP_KEEPALIVE);
+  SWITCH(TCP_QUEUE_OOSEQ);
+  SWITCH(LWIP_TCP_PCB_NUM_EXT_ARGS);
+  SWITCH(LWIP_CALLBACK_API);
+  SWITCH(LWIP_EVENT_API);
+  ENTRY(TCP_MSS, TCP_MSS);
+  ENTRY(TCP_SND_BUF, TCP_SND_BUF);
+  ENTRY(TCP_WND, TCP_WND);
+  ENTRY(TCP_SND_QUEUELEN, TCP_SND_QUEUELEN);
+  ENTRY(TCP_SNDQUEUELEN_OVERFLOW, TCP_SNDQUEUELEN_OVERFLOW);
+  ENTRY(TCP_TTL, TCP_TTL);
+  ENTRY(TCP_OVERSIZE, TCP_OVERSIZE);
+#if defined(LWIP_HOOK_TCP_OUT_TCPOPT_LENGTH) || defined(LWIP_HOOK_TCP_OUT_ADD_TCPOPTS) || \
+    defined(LWIP_HOOK_TCP_INPACKET_PCB) || defined(LWIP_HOOK_TCP_PARSE_OPTION)
+  ENTRY(TCP_HOOKS, 1);
+#else
+  ENTRY(TCP_HOOKS, 0);
+#endif
+
   /* Layouts. */
   ENTRY(SIZEOF_POINTER, sizeof(void *));
   ENTRY(SIZEOF_PBUF, sizeof(struct pbuf));
@@ -439,10 +466,31 @@ void lwip_rust_config(void)
   ENTRY(PBUF_CUSTOM_FREE_FUNCTION, offsetof(struct pbuf_custom, custom_free_function));
 #endif
 #if LWIP_TCP
+  ENTRY(SIZEOF_TCPWND_SIZE_T, sizeof(tcpwnd_size_t));
+  ENTRY(SIZEOF_TCP_PCB, sizeof(struct tcp_pcb));
   ENTRY(TCP_PCB_NEXT, offsetof(struct tcp_pcb, next));
+  ENTRY(TCP_PCB_STATE, offsetof(struct tcp_pcb, state));
+  ENTRY(TCP_PCB_FLAGS, offsetof(struct tcp_pcb, flags));
+  ENTRY(TCP_PCB_TMR, offsetof(struct tcp_pcb, tmr));
+  ENTRY(TCP_PCB_RCV_ANN_RIGHT_EDGE, offsetof(struct tcp_pcb, rcv_ann_right_edge));
+  ENTRY(TCP_PCB_RTTEST, offsetof(struct tcp_pcb, rttest));
+  ENTRY(TCP_PCB_LASTACK, offsetof(struct tcp_pcb, lastack));
+  ENTRY(TCP_PCB_SND_NXT, offsetof(struct tcp_pcb, snd_nxt));
+  ENTRY(TCP_PCB_SND_BUF, offsetof(struct tcp_pcb, snd_buf));
+  ENTRY(TCP_PCB_BYTES_ACKED, offsetof(struct tcp_pcb, bytes_acked));
 #if TCP_QUEUE_OOSEQ
   ENTRY(TCP_PCB_OOSEQ, offsetof(struct tcp_pcb, ooseq));
 #endif
+  ENTRY(TCP_PCB_LISTENER, offsetof(struct tcp_pcb, listener));
+  ENTRY(TCP_PCB_ERRF, offsetof(struct tcp_pcb, errf));
+  ENTRY(TCP_PCB_KEEP_IDLE, offsetof(struct tcp_pcb, keep_idle));
+  ENTRY(TCP_PCB_KEEP_CNT_SENT, offsetof(struct tcp_pcb, keep_cnt_sent));
+  ENTRY(SIZEOF_TCP_PCB_LISTEN, sizeof(struct tcp_pcb_listen));
+  ENTRY(TCP_PCB_LISTEN_ACCEPT, offsetof(struct tcp_pcb_listen, accept));
+  ENTRY(TCP_PCB_LISTEN_ACCEPTS_PENDING, offsetof(struct tcp_pcb_listen, accepts_pending));
+  ENTRY(SIZEOF_TCP_SEG, sizeof(struct tcp_seg));
+  ENTRY(TCP_SEG_TCPHDR, offsetof(struct tcp_seg, tcphdr));
+  ENTRY(SIZEOF_TCP_HDR, sizeof(struct tcp_hdr));
 #endif
 
   ENTRY(SIZEOF_IP4_ADDR, sizeof(ip4_addr_t));
