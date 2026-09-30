@@ -8,7 +8,7 @@
 # made local, so the C stack keeps binding to its own C library and libgcc.
 #
 # The Rust code's C library calls, including the memcpy and memmove the compiler emits,
-# go to forkpoint-libc: its members are linked in whole, and their strong definitions
+# go to rivet-libc: its members are linked in whole, and their strong definitions
 # win over the weak ones the compiler builtins carry.
 
 foreach(var NM LINKER OBJCOPY ARCHIVE OUTPUT)
@@ -39,7 +39,7 @@ foreach(line ${lines})
             continue()
         elseif(member MATCHES "^lwip-")
             list(APPEND exports "${symbol}")
-        elseif(member MATCHES "^forkpoint_libc-")
+        elseif(member MATCHES "^rivet_libc-")
             list(APPEND libc "${symbol}")
         endif()
     endif()

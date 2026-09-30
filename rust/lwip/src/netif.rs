@@ -1412,7 +1412,7 @@ pub unsafe extern "C" fn netif_find(name: *const c_char) -> *mut Netif {
     // SAFETY: NUL-terminated, per the caller; C reads name[2] too, so the string has at
     // least that many bytes or a NUL before.
     unsafe {
-        let num = forkpoint_libc::atoi(name.add(2)) as u8;
+        let num = rivet_libc::atoi(name.add(2)) as u8;
         if num == 0 && *name.add(2) != b'0' as c_char {
             // Treat "et" as "et0" is not supported.
             return ptr::null_mut();

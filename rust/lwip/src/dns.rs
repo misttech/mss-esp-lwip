@@ -429,8 +429,8 @@ unsafe fn dns_compare_name(mut query: *const c_char, p: *mut Pbuf, start_offset:
                     if c < 0 {
                         return 0xFFFF;
                     }
-                    if forkpoint_libc::tolower(c_int::from(*query as u8))
-                        != forkpoint_libc::tolower(c_int::from(c as u8))
+                    if rivet_libc::tolower(c_int::from(*query as u8))
+                        != rivet_libc::tolower(c_int::from(c as u8))
                     {
                         return 0xFFFF;
                     }
@@ -534,7 +534,7 @@ unsafe fn dns_send(idx: u8) -> ErrT {
         let name = (&raw const (*e).name).cast::<c_char>();
         // If here, we have either a new query or a retry on a previous query to process.
         let length = usize::from(SIZEOF_DNS_HDR)
-            + forkpoint_libc::strlen(name)
+            + rivet_libc::strlen(name)
             + 2
             + usize::from(SIZEOF_DNS_QUERY);
         let p = pbuf_alloc(
@@ -1329,7 +1329,7 @@ pub unsafe extern "C" fn dns_gethostbyname_addrtype_n(
         if addr_cnt == 0 || usize::from(addr_cnt) > DNS_MAX_HOST_IP {
             return ERR_ARG;
         }
-        let mut hostnamelen = forkpoint_libc::strlen(hostname);
+        let mut hostnamelen = rivet_libc::strlen(hostname);
         if *hostname.add(hostnamelen - 1) == b'.' as c_char {
             hostnamelen -= 1;
         }
@@ -1337,7 +1337,7 @@ pub unsafe extern "C" fn dns_gethostbyname_addrtype_n(
             return ERR_ARG;
         }
 
-        if forkpoint_libc::strcmp(hostname, c"localhost".as_ptr()) == 0 {
+        if rivet_libc::strcmp(hostname, c"localhost".as_ptr()) == 0 {
             if addrtype_is_ipv6(dns_addrtype) {
                 (*addr).copy_from_ip6(&Ip6Addr {
                     addr: [0, 0, 0, 1_u32.to_be()],
@@ -1375,7 +1375,7 @@ pub unsafe extern "C" fn dns_gethostbyname_addrtype_n(
             }
         }
 
-        let local = forkpoint_libc::strstr(hostname, c".local".as_ptr());
+        let local = rivet_libc::strstr(hostname, c".local".as_ptr());
         let is_mdns =
             u8::from(local.cast_const() == hostname.wrapping_add(hostnamelen).wrapping_sub(6));
 

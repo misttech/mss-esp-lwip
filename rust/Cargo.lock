@@ -3,13 +3,6 @@
 version = 4
 
 [[package]]
-name = "forkpoint-libc"
-version = "0.1.0"
-dependencies = [
- "fp",
-]
-
-[[package]]
 name = "fp"
 version = "0.1.0"
 
@@ -17,6 +10,13 @@ version = "0.1.0"
 name = "lwip"
 version = "0.1.0"
 dependencies = [
- "forkpoint-libc",
+ "fp",
+ "rivet-libc",
+]
+
+[[package]]
+name = "rivet-libc"
+version = "0.1.0"
+dependencies = [
  "fp",
 ]

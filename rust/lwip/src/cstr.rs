@@ -55,5 +55,5 @@ impl Cursor {
 /// `s` is a NUL-terminated string.
 pub(crate) unsafe fn strlen(s: *const c_char) -> usize {
     // SAFETY: `s` is NUL-terminated, per the caller.
-    unsafe { forkpoint_libc::strlen(s) }
+    unsafe { rivet_libc::strlen(s) }
 }

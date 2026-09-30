@@ -1546,7 +1546,7 @@ unsafe fn dhcp_option_hostname(mut options_out_len: u16, msg: *mut u8, netif: *m
     unsafe {
         let hostname = (*netif).hostname;
         if !hostname.is_null() {
-            let namelen = forkpoint_libc::strlen(hostname);
+            let namelen = rivet_libc::strlen(hostname);
             if namelen > 0 {
                 // Shrink len to available bytes (need 2 bytes for OPTION_HOSTNAME and 1
                 // byte for trailer).

@@ -1,7 +1,7 @@
 // Copyright 2026 Mist Tecnologia LTDA. All rights reserved.
 
 //! What the C stack gets from `arch/cc.h`: assertions. They fail through the C library,
-//! `forkpoint-libc`, whose panic handler also serves this crate in firmware.
+//! `rivet-libc`, whose panic handler also serves this crate in firmware.
 
 /// `LWIP_ASSERT(message, assertion)`: when `assertion` is false, report `message` the way
 /// the port's `LWIP_PLATFORM_ASSERT` does. Compiled out with `LWIP_NOASSERT`.
@@ -28,7 +28,7 @@ pub(crate) fn platform_assert(file: &str, line: u32, func: &str, message: &str) 
     #[cfg(all(target_os = "none", not(lwip_assert_silent)))]
     // SAFETY: each string is NUL-terminated and static.
     unsafe {
-        forkpoint_libc::__assert_func(
+        rivet_libc::__assert_func(
             file.as_ptr().cast(),
             line as core::ffi::c_int,
             func.as_ptr().cast(),
@@ -38,7 +38,7 @@ pub(crate) fn platform_assert(file: &str, line: u32, func: &str, message: &str) 
     #[cfg(all(target_os = "none", lwip_assert_silent))]
     {
         let _ = (file, line, func, message);
-        forkpoint_libc::abort()
+        rivet_libc::abort()
     }
     #[cfg(not(target_os = "none"))]
     {
@@ -54,7 +54,7 @@ pub(crate) fn platform_assert(file: &str, line: u32, func: &str, message: &str) 
 /// The panic handler of a host build linked into a C program, such as lwIP's own unit
 /// tests: a failed assertion panics (see `platform_assert`), which reports the message
 /// on standard error and aborts, as the Unix port's `LWIP_PLATFORM_ASSERT` does. A
-/// firmware's is forkpoint-libc's; a host test's is the standard library's.
+/// firmware's is rivet-libc's; a host test's is the standard library's.
 #[cfg(all(lwip_export, not(target_os = "none"), not(test)))]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {

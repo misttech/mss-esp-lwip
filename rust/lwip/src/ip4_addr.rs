@@ -112,22 +112,22 @@ pub extern "C" fn ip4_addr_netmask_valid(netmask: u32) -> u8 {
 
 /// `lwip_isdigit()`: the C library's `isdigit((unsigned char)c)`.
 fn isdigit(c: u8) -> bool {
-    forkpoint_libc::isdigit(c_int::from(c)) != 0
+    rivet_libc::isdigit(c_int::from(c)) != 0
 }
 
 /// `lwip_isxdigit()`.
 fn isxdigit(c: u8) -> bool {
-    forkpoint_libc::isxdigit(c_int::from(c)) != 0
+    rivet_libc::isxdigit(c_int::from(c)) != 0
 }
 
 /// `lwip_islower()`.
 fn islower(c: u8) -> bool {
-    forkpoint_libc::islower(c_int::from(c)) != 0
+    rivet_libc::islower(c_int::from(c)) != 0
 }
 
 /// `lwip_isspace()`: space, `\f`, `\n`, `\r`, `\t`, and `\v`.
 fn isspace(c: u8) -> bool {
-    forkpoint_libc::isspace(c_int::from(c)) != 0
+    rivet_libc::isspace(c_int::from(c)) != 0
 }
 
 /// Ascii internet address interpretation routine. Check whether `cp` is a valid ascii
