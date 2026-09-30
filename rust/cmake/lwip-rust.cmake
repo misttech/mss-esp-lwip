@@ -42,7 +42,8 @@ set(LWIP_RUST_FILES
     "dns=core/dns.c"
     "dhcp=core/ipv4/dhcp.c"
     "tcp=core/tcp.c"
-    "tcp_out=core/tcp_out.c")
+    "tcp_out=core/tcp_out.c"
+    "tcp_in=core/tcp_in.c")
 
 function(lwip_rust_apply target)
     set(modules ${ARGN})

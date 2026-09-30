@@ -469,9 +469,9 @@ fn nothing_is_sent_while_input_processes_the_pcb_or_without_a_route() {
         unsafe {
             (*pcb).flags |= TF_NODELAY;
             assert_eq!(write(pcb, &data(10), 0), ERR_OK);
-            crate::test_support::tcp_input_pcb = pcb;
+            crate::tcp_in::tcp_input_pcb.set(pcb);
             assert_eq!(tcp_output(pcb), ERR_OK);
-            crate::test_support::tcp_input_pcb = ptr::null_mut();
+            crate::tcp_in::tcp_input_pcb.set(ptr::null_mut());
             assert!(frames().is_empty());
 
             (*pcb).remote_ip = IpAddr::v4(ip4(10, 0, 0, 1).addr);

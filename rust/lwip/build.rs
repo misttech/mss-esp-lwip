@@ -134,6 +134,8 @@ const SWITCHES: &[(&str, u64)] = &[
     ("TCP_LISTEN_BACKLOG", 1),
     ("TCP_CALCULATE_EFF_SEND_MSS", 1),
     ("LWIP_ND6", 1),
+    ("LWIP_SO_LINGER", 0),
+    ("LWIP_ND6_TCP_REACHABILITY_HINTS", 1),
     ("SYS_LIGHTWEIGHT_PROT", 1),
     ("LWIP_TESTMODE", 0),
     ("ESP_LWIP_ARP", 1),
@@ -225,6 +227,7 @@ const VALUES: &[(&str, u64)] = &[
     ("TCP_FIN_WAIT_TIMEOUT", 20000),
     ("TCP_SYN_RCVD_TIMEOUT", 20000),
     ("TCP_OOSEQ_TIMEOUT", 6),
+    ("TCP_DEFAULT_LISTEN_BACKLOG", 0xff),
     ("TCP_MSL", 60000),
     ("TCP_KEEPIDLE_DEFAULT", 7200000),
     ("TCP_KEEPINTVL_DEFAULT", 75000),
@@ -232,6 +235,8 @@ const VALUES: &[(&str, u64)] = &[
     ("LWIP_TCP_RTO_TIME", 1500),
     ("TCP_ISN_HOOK", 1),
     ("TCP_C_OVERRIDES", 0),
+    ("TCP_OOSEQ_PBUFS_LIMIT_", 4),
+    ("TCP_OOSEQ_BYTES_LIMITED", 0),
     // Read only when a tcp_pcb exists; host tests have none.
     ("TCP_PCB_NEXT", 0),
     ("TCP_PCB_OOSEQ", 0),
@@ -586,6 +591,26 @@ fn main() {
     ];
     requires("tcp_out", &tcp_common);
     requires("tcp", &tcp_common);
+    requires("tcp_in", &tcp_common);
+    requires(
+        "tcp_in",
+        &[
+            ("TCP_LISTEN_BACKLOG", 1),
+            ("TCP_CALCULATE_EFF_SEND_MSS", 1),
+            ("LWIP_ND6", 1),
+            ("LWIP_ND6_TCP_REACHABILITY_HINTS", 1),
+            ("LWIP_SO_LINGER", 0),
+            ("SO_REUSE", 1),
+            ("TCP_OOSEQ_BYTES_LIMITED", 0),
+        ],
+    );
+    if env::var_os("CARGO_FEATURE_TCP_IN").is_some() {
+        assert_ne!(
+            value("TCP_OOSEQ_PBUFS_LIMIT_"),
+            Some(0),
+            "tcp_in: an unlimited ooseq queue is not ported"
+        );
+    }
     requires(
         "tcp",
         &[
@@ -678,6 +703,7 @@ fn main() {
         ("ip4_frag", &["IPFRAG_STATS"]),
         ("icmp", &["ICMP_STATS"]),
         ("udp", &["UDP_STATS"]),
+        ("tcp_in", &["TCP_STATS"]),
         ("tcp_out", &["TCP_STATS"]),
     ] {
         for counter in counters {
