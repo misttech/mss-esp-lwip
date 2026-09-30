@@ -131,6 +131,9 @@ const SWITCHES: &[(&str, u64)] = &[
     ("LWIP_TCP_PCB_NUM_EXT_ARGS", 0),
     ("LWIP_CALLBACK_API", 1),
     ("LWIP_EVENT_API", 0),
+    ("TCP_LISTEN_BACKLOG", 1),
+    ("TCP_CALCULATE_EFF_SEND_MSS", 1),
+    ("LWIP_ND6", 1),
 ];
 
 /// Values. ESP-IDF v6.1 defaults.
@@ -201,6 +204,22 @@ const VALUES: &[(&str, u64)] = &[
     ("TCP_TTL", 64),
     ("TCP_OVERSIZE", 1440),
     ("TCP_HOOKS", 0),
+    ("TCP_MAXRTX", 12),
+    ("TCP_SYNMAXRTX", 12),
+    ("TCP_PRIO_NORMAL", 64),
+    ("TCP_PRIO_MAX", 127),
+    ("TCP_WND_UPDATE_THRESHOLD", 1440),
+    ("TCP_SLOW_INTERVAL", 500),
+    ("TCP_FIN_WAIT_TIMEOUT", 20000),
+    ("TCP_SYN_RCVD_TIMEOUT", 20000),
+    ("TCP_OOSEQ_TIMEOUT", 6),
+    ("TCP_MSL", 60000),
+    ("TCP_KEEPIDLE_DEFAULT", 7200000),
+    ("TCP_KEEPINTVL_DEFAULT", 75000),
+    ("TCP_KEEPCNT_DEFAULT", 9),
+    ("LWIP_TCP_RTO_TIME", 1500),
+    ("TCP_ISN_HOOK", 1),
+    ("TCP_C_OVERRIDES", 0),
     // Read only when a tcp_pcb exists; host tests have none.
     ("TCP_PCB_NEXT", 0),
     ("TCP_PCB_OOSEQ", 0),
@@ -545,6 +564,20 @@ fn main() {
         ("ESP_LWIP", 1),
     ];
     requires("tcp_out", &tcp_common);
+    requires("tcp", &tcp_common);
+    requires(
+        "tcp",
+        &[
+            ("TCP_LISTEN_BACKLOG", 1),
+            ("TCP_CALCULATE_EFF_SEND_MSS", 1),
+            ("LWIP_ND6", 1),
+            ("LWIP_AUTOIP", 0),
+            ("SO_REUSE", 1),
+            ("LWIP_RAND_DEFINED", 1),
+            ("TCP_ISN_HOOK", 1),
+            ("TCP_C_OVERRIDES", 0),
+        ],
+    );
     if env::var_os("CARGO_FEATURE_TCP_OUT").is_some() {
         assert_eq!(
             value("TCP_OVERSIZE"),
