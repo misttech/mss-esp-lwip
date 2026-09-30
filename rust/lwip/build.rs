@@ -76,6 +76,27 @@ const SWITCHES: &[(&str, u64)] = &[
     ("LWIP_IPV6_DHCP6", 0),
     ("LWIP_NETIF_HOOKS", 0),
     ("LWIP_NETIF_STATS_DEBUG", 0),
+    ("LWIP_ICMP", 1),
+    ("IP_FORWARD", 0),
+    ("IP_REASSEMBLY", 0),
+    ("IP_FRAG", 1),
+    ("IP_OPTIONS_ALLOWED", 1),
+    ("IP_OPTIONS_SEND", 1),
+    ("IP_ACCEPT_LINK_LAYER_ADDRESSING", 1),
+    ("CHECKSUM_GEN_IP", 1),
+    ("CHECKSUM_CHECK_IP", 0),
+    ("CHECKSUM_GEN_ICMP", 1),
+    ("CHECKSUM_CHECK_ICMP", 1),
+    ("CHECKSUM_GEN_IP_INLINE", 1),
+    ("LWIP_BROADCAST_PING", 0),
+    ("LWIP_MULTICAST_PING", 0),
+    ("LWIP_MULTICAST_TX_OPTIONS", 1),
+    ("LWIP_NETIF_LOOPBACK", 1),
+    ("LWIP_NETIF_TX_SINGLE_PBUF", 1),
+    ("LWIP_UDPLITE", 0),
+    ("LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN_DEFINED", 0),
+    ("LWIP_HOOK_IP4_ROUTE_SRC_DEFINED", 1),
+    ("LWIP_IP4_HOOKS", 0),
 ];
 
 /// Values. ESP-IDF v6.1 defaults.
@@ -106,6 +127,8 @@ const VALUES: &[(&str, u64)] = &[
     ("ARP_QUEUE_LEN", 3),
     ("NETIF_NAMESIZE", 6),
     ("PBUF_LINK_LAYER", 14),
+    ("PBUF_IP_LAYER", 54),
+    ("ICMP_TTL", 64),
     // Read only when a tcp_pcb exists; host tests have none.
     ("TCP_PCB_NEXT", 0),
     ("TCP_PCB_OOSEQ", 0),
@@ -335,6 +358,65 @@ fn main() {
             ("MIB2_STATS", 0),
             ("LWIP_ETHERNET", 1),
             ("NO_SYS", 0),
+        ],
+    );
+    // ip4.rs, ip4_frag.rs, and icmp.rs translate the IPv4 files as ESP-IDF configures them.
+    let ip4_common = [
+        ("LWIP_IPV4", 1),
+        ("IP_FORWARD", 0),
+        ("IP_REASSEMBLY", 0),
+        ("LWIP_IP4_HOOKS", 0),
+        ("LWIP_CHECKSUM_CTRL_PER_NETIF", 0),
+        ("LWIP_NETIF_USE_HINTS", 0),
+        ("LWIP_SINGLE_NETIF", 0),
+        ("IP_NAPT", 0),
+    ];
+    requires("ip4", &ip4_common);
+    requires(
+        "ip4",
+        &[
+            ("IP_OPTIONS_ALLOWED", 1),
+            ("IP_OPTIONS_SEND", 1),
+            ("IP_ACCEPT_LINK_LAYER_ADDRESSING", 1),
+            ("CHECKSUM_GEN_IP", 1),
+            ("CHECKSUM_CHECK_IP", 0),
+            ("CHECKSUM_GEN_IP_INLINE", 1),
+            ("LWIP_MULTICAST_TX_OPTIONS", 1),
+            ("ENABLE_LOOPBACK", 1),
+            ("LWIP_NETIF_LOOPBACK", 1),
+            ("LWIP_HAVE_LOOPIF", 1),
+            ("LWIP_HOOK_IP4_ROUTE_SRC_DEFINED", 1),
+            ("IP_FRAG", 1),
+            ("LWIP_IGMP", 1),
+            ("LWIP_RAW", 1),
+            ("LWIP_UDP", 1),
+            ("LWIP_UDPLITE", 0),
+            ("LWIP_TCP", 1),
+            ("LWIP_ICMP", 1),
+            ("LWIP_DHCP", 1),
+            ("LWIP_AUTOIP", 0),
+        ],
+    );
+    requires("ip4_frag", &ip4_common);
+    requires(
+        "ip4_frag",
+        &[
+            ("IP_FRAG", 1),
+            ("LWIP_NETIF_TX_SINGLE_PBUF", 1),
+            ("CHECKSUM_GEN_IP", 1),
+        ],
+    );
+    requires("icmp", &ip4_common);
+    requires(
+        "icmp",
+        &[
+            ("LWIP_ICMP", 1),
+            ("CHECKSUM_GEN_ICMP", 1),
+            ("CHECKSUM_CHECK_ICMP", 1),
+            ("CHECKSUM_GEN_IP", 1),
+            ("LWIP_BROADCAST_PING", 0),
+            ("LWIP_MULTICAST_PING", 0),
+            ("LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN_DEFINED", 0),
         ],
     );
     if env::var_os("CARGO_FEATURE_NETIF").is_some() {

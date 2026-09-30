@@ -13,7 +13,7 @@ of the stack moves to Rust and those pointers become references.
 | `platform` | 1 | 0 | 0 | Calling the C library's `__assert_func` |
 | `sys` | 2 | 0 | 0 | The port's critical section |
 | `global` | 2 | 0 | 1 | lwIP's global variables, laid out as C's |
-| `links` | 5 | 3 | 0 | Calls between modules, Rust or C (the macros expand to one wrapper per function) |
+| `links` | 8 | 3 | 0 | Calls between modules, Rust or C (the macros expand to one wrapper per function) |
 | `def` | 12 | 10 | 0 | The C string functions' pointer arguments |
 | `inet_chksum` | 19 | 12 | 0 | Buffers and pbuf chains from C callers |
 | `ip4_addr` | 10 | 6 | 1 | C strings and buffers; `ip4addr_ntoa`'s static buffer |
@@ -23,6 +23,9 @@ of the stack moves to Rust and those pointers become references.
 | `netif` | 39 | 38 | 0 | Netifs, addresses, and callbacks C registers; the loopback queue |
 | `ethernet` | 2 | 2 | 0 | Frames in C pbufs; the driver's `linkoutput` |
 | `etharp` | 26 | 17 | 0 | The ARP table C holds pointers into; packed ARP headers in C pbufs |
+| `ip4` | 11 | 11 | 0 | Packets and netifs from C; `ip_data`, which ip.c owns; packed IP headers |
+| `ip4_frag` | 1 | 1 | 0 | The datagram and its fragments' headers |
+| `icmp` | 3 | 3 | 0 | Echo and unreachable messages built in C pbufs |
 
 `pbuf` and `netif` are the largest: every pbuf and netif is shared with C, which holds raw pointers to
 it, so each field access is a raw place access under the module's one safety
