@@ -31,6 +31,7 @@ of the stack moves to Rust and those pointers become references.
 | `dhcp` | 49 | 44 | 0 | Netifs and their `struct dhcp`, which C reads; messages built and parsed in C pbufs |
 | `tcp` | 67 | 54 | 1 | PCB lists and callbacks C shares; timers walking lists callbacks may change; the list-head array |
 | `tcp_out` | 36 | 36 | 0 | PCBs and segment queues C shares; headers built in C pbufs |
+| `tcp_in` | 36 | 34 | 0 | Segments in C pbufs and their headers; PCB lists and callbacks C shares; the out-of-sequence queue |
 | `dns` | 29 | 21 | 0 | Host names and addresses from C callers; the tables found callbacks may re-enter; responses in C pbufs |
 
 `pbuf` and `netif` are the largest: every pbuf and netif is shared with C, which holds raw pointers to

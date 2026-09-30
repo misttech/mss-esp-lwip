@@ -75,9 +75,6 @@ extern "C" fn tcpip_input(p: *mut Pbuf, _inp: *mut Netif) -> ErrT {
 #[unsafe(no_mangle)]
 static mut ip_data: MaybeUninit<IpGlobals> = MaybeUninit::zeroed();
 
-/// Packets the protocol stand-ins received.
-pub(crate) static TCP_INPUTS: AtomicUsize = AtomicUsize::new(0);
-
 /// ip.c's `ip_addr_any_type`: the dual-stack any address.
 #[unsafe(no_mangle)]
 static ip_addr_any_type: IpAddr = IpAddr {
@@ -109,12 +106,6 @@ extern "C" fn ip6_output_if_src(
 ) -> ErrT {
     IP6_OUTPUTS.fetch_add(1, Relaxed);
     0
-}
-
-#[unsafe(no_mangle)]
-extern "C" fn tcp_input(p: *mut Pbuf, _inp: *mut Netif) {
-    TCP_INPUTS.fetch_add(1, Relaxed);
-    consume(p);
 }
 
 #[unsafe(no_mangle)]
@@ -248,10 +239,6 @@ extern "C" fn dhcp_append_extra_opts(
 ) {
 }
 
-/// tcp_in.c's `tcp_input_pcb`, until it is ported.
-#[unsafe(no_mangle)]
-pub(crate) static mut tcp_input_pcb: *mut crate::types::TcpPcb = core::ptr::null_mut();
-
 /// Times TCP asked for its timer (timeouts.c's `tcp_timer_needed`).
 pub(crate) static TCP_TIMER_NEEDED: AtomicUsize = AtomicUsize::new(0);
 
@@ -260,15 +247,14 @@ extern "C" fn tcp_timer_needed() {
     TCP_TIMER_NEEDED.fetch_add(1, Relaxed);
 }
 
-/// Times tcp.c asked tcp_in.c to free the PCB it is processing.
-pub(crate) static TCP_INPUT_PCB_CLOSES: AtomicUsize = AtomicUsize::new(0);
-
+/// nd6.c's `nd6_reachability_hint`: nothing to track.
 #[unsafe(no_mangle)]
-extern "C" fn tcp_trigger_input_pcb_close() {
-    TCP_INPUT_PCB_CLOSES.fetch_add(1, Relaxed);
-}
+extern "C" fn nd6_reachability_hint(_ip6addr: *const c_void) {}
 
-/// ESP-IDF's `lwip_hook_tcp_isn`: a fixed sequence, so tests are repeatable.
+/// The ISN the stand-in hook gives every connection; test_tcp.c's is 6510.
+pub(crate) static TCP_ISS: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(6510);
+
+/// ESP-IDF's `lwip_hook_tcp_isn`: the ISN a test chose, so tests are repeatable.
 #[unsafe(no_mangle)]
 extern "C" fn lwip_hook_tcp_isn(
     _local_ip: *const IpAddr,
@@ -276,8 +262,7 @@ extern "C" fn lwip_hook_tcp_isn(
     _remote_ip: *const IpAddr,
     _remote_port: u16,
 ) -> u32 {
-    static ISN: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(6510);
-    ISN.fetch_add(64000, Relaxed)
+    TCP_ISS.load(Relaxed)
 }
 
 /// nd6.c's `nd6_get_destination_mtu`: the IPv6 minimum link MTU.

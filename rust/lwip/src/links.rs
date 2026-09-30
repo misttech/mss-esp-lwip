@@ -156,6 +156,33 @@ ported! {
     tcp "tcp": fn tcp_segs_free(seg: *mut TcpSeg);
     tcp "tcp": fn tcp_netif_ip_addr_changed(old_addr: *const IpAddr, new_addr: *const IpAddr);
     tcp "tcp": fn tcp_free_ooseq(pcb: *mut TcpPcb);
+    tcp "tcp": fn tcp_process_refused_data(pcb: *mut TcpPcb) -> ErrT;
+    tcp "tcp": fn tcp_pcb_remove(pcblist: *mut *mut TcpPcb, pcb: *mut TcpPcb);
+    tcp "tcp": fn tcp_free(pcb: *mut TcpPcb);
+    tcp "tcp": fn tcp_abort(pcb: *mut TcpPcb);
+    tcp "tcp": fn tcp_abandon(pcb: *mut TcpPcb, reset: c_int);
+    tcp "tcp": fn tcp_alloc(prio: u8) -> *mut TcpPcb;
+    tcp "tcp": fn tcp_next_iss(pcb: *mut TcpPcb) -> u32;
+    tcp "tcp": fn tcp_backlog_accepted(pcb: *mut TcpPcb);
+    tcp "tcp": fn tcp_pcb_purge(pcb: *mut TcpPcb);
+    tcp "tcp": fn tcp_update_rcv_ann_wnd(pcb: *mut TcpPcb) -> u32;
+    tcp "tcp": fn tcp_recv_null(arg: *mut c_void, pcb: *mut TcpPcb, p: *mut Pbuf, err: ErrT) -> ErrT;
+    tcp "tcp": fn tcp_seg_copy(seg: *mut TcpSeg) -> *mut TcpSeg;
+    tcp_in "tcp_in": fn tcp_trigger_input_pcb_close();
+    tcp_in "tcp_in": fn tcp_input(p: *mut Pbuf, inp: *mut Netif);
+    tcp_out "tcp_out": fn tcp_send_empty_ack(pcb: *mut TcpPcb) -> ErrT;
+    tcp_out "tcp_out": fn tcp_rst_netif(
+        netif: *mut Netif,
+        seqno: u32,
+        ackno: u32,
+        local_ip: *const IpAddr,
+        remote_ip: *const IpAddr,
+        local_port: u16,
+        remote_port: u16,
+    );
+    tcp_out "tcp_out": fn tcp_rexmit(pcb: *mut TcpPcb) -> ErrT;
+    tcp_out "tcp_out": fn tcp_rexmit_fast(pcb: *mut TcpPcb);
+    tcp_out "tcp_out": fn tcp_rexmit_rto(pcb: *mut TcpPcb);
     tcp_out "tcp_out": fn tcp_rst(
         pcb: *const TcpPcb,
         seqno: u32,
@@ -217,7 +244,7 @@ c_only! {
     ) -> ErrT;
     fn icmp6_dest_unreach(p: *mut Pbuf, c: core::ffi::c_uint);
     fn tcp_timer_needed();
-    fn tcp_trigger_input_pcb_close();
+    fn nd6_reachability_hint(ip6addr: *const Ip6Addr);
     fn lwip_hook_tcp_isn(local_ip: *const IpAddr, local_port: u16, remote_ip: *const IpAddr, remote_port: u16) -> u32;
     fn nd6_get_destination_mtu(ip6addr: *const Ip6Addr, netif: *mut Netif) -> u16;
     fn ip6_output_if(
@@ -229,7 +256,6 @@ c_only! {
         nexth: u8,
         netif: *mut Netif,
     ) -> ErrT;
-    fn tcp_input(p: *mut Pbuf, inp: *mut Netif);
     fn igmp_input(p: *mut Pbuf, inp: *mut Netif, dest: *const Ip4Addr);
     fn igmp_lookfor_group(ifp: *mut Netif, addr: *const Ip4Addr) -> *mut c_void;
     fn tcpip_try_callback(function: Option<unsafe extern "C" fn(ctx: *mut c_void)>, ctx: *mut c_void) -> ErrT;
@@ -403,9 +429,13 @@ mod c_tcp {
     unsafe extern "C" {
         pub(super) static mut tcp_ticks: u32;
         pub(super) static mut tcp_active_pcbs: *mut TcpPcb;
+        pub(super) static mut tcp_tw_pcbs: *mut TcpPcb;
+        pub(super) static mut tcp_listen_pcbs: *mut TcpPcb;
+        pub(super) static mut tcp_active_pcbs_changed: u8;
     }
 }
 
+#[cfg(not(feature = "tcp_in"))]
 mod c_tcp_in {
     use super::TcpPcb;
 
@@ -424,18 +454,58 @@ pub(crate) fn tcp_ticks() -> u32 {
     ticks
 }
 
-/// `tcp_active_pcbs`: tcp.c's active connections, Rust or C.
-pub(crate) fn tcp_active_pcbs() -> *mut TcpPcb {
+/// `&tcp_active_pcbs`: tcp.c's list of active connections, Rust or C.
+pub(crate) fn tcp_active_pcbs_head() -> *mut *mut TcpPcb {
     #[cfg(feature = "tcp")]
-    let pcbs = crate::tcp::tcp_active_pcbs.get();
+    let head = crate::tcp::tcp_active_pcbs.as_ptr();
     #[cfg(not(feature = "tcp"))]
-    // SAFETY: the stack serializes access to its globals.
-    let pcbs = unsafe { (&raw const c_tcp::tcp_active_pcbs).read() };
-    pcbs
+    // SAFETY: only the address is taken.
+    let head = unsafe { &raw mut c_tcp::tcp_active_pcbs };
+    head
 }
 
-/// `tcp_input_pcb`: the PCB tcp_in.c is processing input for (tcp_in.c is C).
-pub(crate) fn tcp_input_pcb() -> *mut TcpPcb {
+/// `&tcp_tw_pcbs`: tcp.c's list of connections in TIME-WAIT, Rust or C.
+pub(crate) fn tcp_tw_pcbs_head() -> *mut *mut TcpPcb {
+    #[cfg(feature = "tcp")]
+    let head = crate::tcp::tcp_tw_pcbs.as_ptr();
+    #[cfg(not(feature = "tcp"))]
+    // SAFETY: only the address is taken.
+    let head = unsafe { &raw mut c_tcp::tcp_tw_pcbs };
+    head
+}
+
+/// `&tcp_listen_pcbs`: tcp.c's list of listening PCBs, Rust or C.
+pub(crate) fn tcp_listen_pcbs_head() -> *mut *mut TcpPcb {
+    #[cfg(feature = "tcp")]
+    let head = crate::tcp::tcp_listen_pcbs.as_ptr();
+    #[cfg(not(feature = "tcp"))]
+    // SAFETY: only the address is taken.
+    let head = unsafe { &raw mut c_tcp::tcp_listen_pcbs };
+    head
+}
+
+/// `&tcp_active_pcbs_changed`, Rust or C.
+pub(crate) fn tcp_active_pcbs_changed() -> *mut u8 {
+    #[cfg(feature = "tcp")]
+    let flag = crate::tcp::tcp_active_pcbs_changed.as_ptr();
+    #[cfg(not(feature = "tcp"))]
+    // SAFETY: only the address is taken.
+    let flag = unsafe { &raw mut c_tcp::tcp_active_pcbs_changed };
+    flag
+}
+
+/// `tcp_active_pcbs`: tcp.c's active connections, Rust or C.
+pub(crate) fn tcp_active_pcbs() -> *mut TcpPcb {
     // SAFETY: the stack serializes access to its globals.
-    unsafe { (&raw const c_tcp_in::tcp_input_pcb).read() }
+    unsafe { *tcp_active_pcbs_head() }
+}
+
+/// `tcp_input_pcb`: the PCB tcp_in.c is processing input for, Rust or C.
+pub(crate) fn tcp_input_pcb() -> *mut TcpPcb {
+    #[cfg(feature = "tcp_in")]
+    let pcb = crate::tcp_in::tcp_input_pcb.get();
+    #[cfg(not(feature = "tcp_in"))]
+    // SAFETY: the stack serializes access to its globals.
+    let pcb = unsafe { (&raw const c_tcp_in::tcp_input_pcb).read() };
+    pcb
 }
