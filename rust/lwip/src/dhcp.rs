@@ -2023,7 +2023,13 @@ unsafe fn dhcp_option_trailer(mut options_out_len: u16, msg: *mut u8, p_out: *mu
     // SAFETY: as the caller guarantees.
     unsafe {
         let options = options(msg);
-        options[usize::from(options_out_len)] = DHCP_OPTION_END;
+        // The options can fill the message: ESP-IDF's vendor class option leaves no room
+        // for the end marker. C then writes the marker one byte past the message,
+        // outside the pbuf, and sends the message without it, as pbuf_realloc below does
+        // not grow a pbuf. The same bytes go out here, without that write.
+        if let Some(end) = options.get_mut(usize::from(options_out_len)) {
+            *end = DHCP_OPTION_END;
+        }
         options_out_len += 1;
         // Packet is too small, or not 4 byte aligned?
         while (options_out_len < DHCP_MIN_OPTIONS_LEN || options_out_len & 3 != 0)
