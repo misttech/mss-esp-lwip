@@ -42,7 +42,7 @@ use crate::types::Ip4Addr;
 use crate::types::Ip6Addr;
 #[cfg(any(lwip_ipv4, lwip_ipv6))]
 use crate::types::IpAddr;
-use crate::types::{Pbuf, pbuf_chain};
+use crate::types::{Pbuf, pbuf_iter};
 
 /// `FOLD_U32T(u)`: add the upper 16 bits of `u` into the lower 16.
 fn fold_u32(u: u32) -> u32 {
@@ -148,7 +148,7 @@ unsafe fn inet_cksum_pseudo_base(p: *const Pbuf, proto: u8, proto_len: u16, mut 
 
     // Iterate through all pbuf in chain.
     // SAFETY: forwarded from the caller.
-    for q in unsafe { pbuf_chain(p) } {
+    for q in unsafe { pbuf_iter(p) } {
         acc = acc.wrapping_add(u32::from(pbuf_chksum(q, usize::from(q.len))));
         // Just executing this next line is probably faster that the if statement needed
         // to check whether we really need to execute it, and does no harm.
@@ -295,7 +295,7 @@ unsafe fn inet_cksum_pseudo_partial_base(
 
     // Iterate through all pbuf in chain.
     // SAFETY: forwarded from the caller.
-    for q in unsafe { pbuf_chain(p) } {
+    for q in unsafe { pbuf_iter(p) } {
         if chksum_len == 0 {
             break;
         }
@@ -429,7 +429,7 @@ pub unsafe extern "C" fn inet_chksum_pbuf(p: *mut Pbuf) -> u16 {
     let mut swapped = false;
 
     // SAFETY: forwarded from the caller.
-    for q in unsafe { pbuf_chain(p) } {
+    for q in unsafe { pbuf_iter(p) } {
         acc = acc.wrapping_add(u32::from(pbuf_chksum(q, usize::from(q.len))));
         acc = fold_u32(acc);
         if q.len % 2 != 0 {

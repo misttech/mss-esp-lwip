@@ -16,7 +16,7 @@ use std::vec::Vec;
 
 use super::*;
 use crate::netif::{netif_add, netif_default, netif_remove, netif_set_default, netif_set_up};
-use crate::test_support::{UDP_INPUTS, serial};
+use crate::test_support::serial;
 
 pub(crate) static LINKOUTPUT_CTR: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static LINKOUTPUT_BYTE_CTR: AtomicUsize = AtomicUsize::new(0);
@@ -239,10 +239,38 @@ fn test_ip4_icmp_replylen_first_8() {
 
 // Beyond test_ip4.c.
 
+/// Datagrams the listeners below received.
+static UDP_RECEIVED: AtomicUsize = AtomicUsize::new(0);
+
+unsafe extern "C" fn count_recv(
+    _arg: *mut core::ffi::c_void,
+    _pcb: *mut UdpPcb,
+    p: *mut Pbuf,
+    _addr: *const IpAddr,
+    _port: u16,
+) {
+    UDP_RECEIVED.fetch_add(1, Relaxed);
+    // SAFETY: the receive callback owns the pbuf.
+    unsafe { pbuf_free(p) };
+}
+
+/// A UDP PCB on `port` of any local address that counts what it receives.
+pub(crate) fn udp_listener(port: u16) -> *mut UdpPcb {
+    let pcb = crate::udp::udp_new();
+    assert!(!pcb.is_null());
+    // SAFETY: a fresh PCB; a null address binds to any.
+    unsafe {
+        assert_eq!(crate::udp::udp_bind(pcb, ptr::null(), port), ERR_OK);
+        crate::udp::udp_recv(pcb, Some(count_recv), ptr::null_mut());
+    }
+    pcb
+}
+
 #[test]
 fn fragments_are_dropped_without_reassembly() {
     with_test_netif(|netif| {
-        let before = UDP_INPUTS.load(Relaxed);
+        let listener = udp_listener(9);
+        let before = UDP_RECEIVED.load(Relaxed);
         for (offset, more) in [(0, true), (25, false)] {
             let mut bytes = ip_header(
                 ip4(192, 168, 0, 2),
@@ -251,26 +279,35 @@ fn fragments_are_dropped_without_reassembly() {
                 200,
                 offset | if more { IP_MF } else { 0 },
             );
-            bytes.extend([0_u8; 200]);
+            // The first fragment starts with a UDP header to the listener's port.
+            bytes.extend([0, 67, 0, 9]);
+            bytes.extend([0_u8; 196]);
             // SAFETY: a live netif; the packet is given up.
             assert_eq!(unsafe { ip4_input(packet(&bytes), netif) }, ERR_OK);
         }
-        assert_eq!(UDP_INPUTS.load(Relaxed), before, "no fragment reaches UDP");
+        assert_eq!(
+            UDP_RECEIVED.load(Relaxed),
+            before,
+            "no fragment reaches UDP"
+        );
+        // SAFETY: a PCB from udp_new.
+        unsafe { crate::udp::udp_remove(listener) };
     });
 }
 
 #[test]
 fn input_accepts_ours_and_dhcp_and_drops_the_rest() {
     with_test_netif(|netif| {
+        let listeners = [udp_listener(9), udp_listener(68)];
         let deliver = |src: Ip4Addr, dest: Ip4Addr, udp_dest: u16| {
             let mut bytes = ip_header(src, dest, IP_PROTO_UDP, 8, 0);
             bytes.extend(67_u16.to_be_bytes());
             bytes.extend(udp_dest.to_be_bytes());
             bytes.extend([0, 8, 0, 0]);
-            let before = UDP_INPUTS.load(Relaxed);
+            let before = UDP_RECEIVED.load(Relaxed);
             // SAFETY: a live netif; the packet is given up.
             unsafe { ip4_input(packet(&bytes), netif) };
-            UDP_INPUTS.load(Relaxed) - before
+            UDP_RECEIVED.load(Relaxed) - before
         };
         // To us, and to the subnet broadcast.
         assert_eq!(deliver(ip4(192, 168, 0, 2), TEST_IPADDR, 9), 1);
@@ -291,6 +328,9 @@ fn input_accepts_ours_and_dhcp_and_drops_the_rest() {
             let mut long = ip_header(ip4(192, 168, 0, 2), TEST_IPADDR, IP_PROTO_UDP, 100, 0);
             long.extend([0; 8]);
             assert_eq!(ip4_input(packet(&long), netif), ERR_OK);
+            for pcb in listeners {
+                crate::udp::udp_remove(pcb);
+            }
         }
     });
 }

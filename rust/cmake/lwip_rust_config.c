@@ -51,6 +51,7 @@
 #include "lwip/prot/icmp.h"
 #include "lwip/prot/udp.h"
 #include "lwip/priv/raw_priv.h"
+#include "lwip/udp.h"
 
 #define ENTRY(name, value) \
   __asm__ volatile("\n.ascii \"@@lwip " #name " %0\\n\"" : : "i"((long)(value)))
@@ -280,6 +281,7 @@ void lwip_rust_config(void)
   SWITCH(LWIP_UDPLITE);
   SWITCH(ICMP_TTL);
   ENTRY(PBUF_IP_LAYER, PBUF_IP);
+  ENTRY(PBUF_TRANSPORT_LAYER, PBUF_TRANSPORT);
 #ifdef LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN
   ENTRY(LWIP_ICMP_ECHO_CHECK_INPUT_PBUF_LEN_DEFINED, 1);
 #else
@@ -297,6 +299,29 @@ void lwip_rust_config(void)
   ENTRY(LWIP_IP4_HOOKS, 1);
 #else
   ENTRY(LWIP_IP4_HOOKS, 0);
+#endif
+
+  /* udp.c. */
+  SWITCH(CHECKSUM_GEN_UDP);
+  SWITCH(CHECKSUM_CHECK_UDP);
+  SWITCH(IP_SOF_BROADCAST);
+  SWITCH(IP_SOF_BROADCAST_RECV);
+  SWITCH(LWIP_ICMP6);
+  SWITCH(SO_REUSE);
+  SWITCH(SO_REUSE_RXTOALL);
+  SWITCH(UDP_TTL);
+  /* udp.c's own defaults unless the port sets the range. */
+#ifdef UDP_LOCAL_PORT_RANGE_START
+  ENTRY(UDP_LOCAL_PORT_RANGE_START_, UDP_LOCAL_PORT_RANGE_START);
+  ENTRY(UDP_LOCAL_PORT_RANGE_END_, UDP_LOCAL_PORT_RANGE_END);
+#else
+  ENTRY(UDP_LOCAL_PORT_RANGE_START_, 0xc000);
+  ENTRY(UDP_LOCAL_PORT_RANGE_END_, 0xffff);
+#endif
+#ifdef LWIP_RAND
+  ENTRY(LWIP_RAND_DEFINED, 1);
+#else
+  ENTRY(LWIP_RAND_DEFINED, 0);
 #endif
 
   /* Layouts. */
@@ -404,6 +429,20 @@ void lwip_rust_config(void)
   ENTRY(SIZEOF_STRUCT_UDP_HDR, sizeof(struct udp_hdr));
   ENTRY(UDP_HDR_DEST, offsetof(struct udp_hdr, dest));
   ENTRY(SIZEOF_RAW_INPUT_STATE, sizeof(raw_input_state_t));
+  ENTRY(SIZEOF_UDP_PCB, sizeof(struct udp_pcb));
+  ENTRY(UDP_PCB_REMOTE_IP, offsetof(struct udp_pcb, remote_ip));
+  ENTRY(UDP_PCB_NETIF_IDX, offsetof(struct udp_pcb, netif_idx));
+  ENTRY(UDP_PCB_TTL, offsetof(struct udp_pcb, ttl));
+  ENTRY(UDP_PCB_NEXT, offsetof(struct udp_pcb, next));
+  ENTRY(UDP_PCB_FLAGS, offsetof(struct udp_pcb, flags));
+  ENTRY(UDP_PCB_LOCAL_PORT, offsetof(struct udp_pcb, local_port));
+  ENTRY(UDP_PCB_REMOTE_PORT, offsetof(struct udp_pcb, remote_port));
+#if LWIP_MULTICAST_TX_OPTIONS
+  ENTRY(UDP_PCB_MCAST_IP4, offsetof(struct udp_pcb, mcast_ip4));
+  ENTRY(UDP_PCB_MCAST_TTL, offsetof(struct udp_pcb, mcast_ttl));
+#endif
+  ENTRY(UDP_PCB_RECV, offsetof(struct udp_pcb, recv));
+  ENTRY(UDP_PCB_RECV_ARG, offsetof(struct udp_pcb, recv_arg));
   ENTRY(SIZEOF_ETH_ADDR, sizeof(struct eth_addr));
   ENTRY(SIZEOF_STRUCT_ETH_HDR, sizeof(struct eth_hdr));
   ENTRY(ETH_HDR_TYPE, offsetof(struct eth_hdr, type));
