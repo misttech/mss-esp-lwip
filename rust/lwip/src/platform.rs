@@ -5,16 +5,26 @@
 
 /// `LWIP_ASSERT(message, assertion)`: when `assertion` is false, report `message` the way
 /// the port's `LWIP_PLATFORM_ASSERT` does. Compiled out with `LWIP_NOASSERT`.
+///
+/// With the `forkpoint` feature it is also a Forkpoint property named `message`, which
+/// fails if `assertion` is ever false, as `LWIP_ASSERT` is in C with `LWIP_FORKPOINT`:
+/// the two share messages, so a C file and its Rust module report the same properties.
+/// The property is reported before a failure stops the firmware.
 macro_rules! lwip_assert {
     ($message:literal, $assertion:expr) => {
         #[cfg(not(lwip_noassert))]
-        if !($assertion) {
-            $crate::platform::platform_assert(
-                concat!(file!(), "\0"),
-                line!(),
-                concat!(module_path!(), "\0"),
-                concat!($message, "\0"),
-            );
+        {
+            let holds: bool = $assertion;
+            #[cfg(feature = "forkpoint")]
+            ::forkpoint::assert_always_or_unreachable!(holds, $message);
+            if !holds {
+                $crate::platform::platform_assert(
+                    concat!(file!(), "\0"),
+                    line!(),
+                    concat!(module_path!(), "\0"),
+                    concat!($message, "\0"),
+                );
+            }
         }
     };
 }

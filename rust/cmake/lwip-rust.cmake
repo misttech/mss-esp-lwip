@@ -20,7 +20,9 @@
 #   4. adds that object to <target>.
 #
 # LWIP_RUST_CARGO names cargo (found on PATH by default), LWIP_RUST_TARGET the Rust target
-# (riscv32imafc-unknown-none-elf by default: rv32imafc, ilp32f).
+# (riscv32imafc-unknown-none-elf by default: rv32imafc, ilp32f). With
+# LWIP_FORKPOINT_HOSTCALL_BASE set, the crate is built with its forkpoint feature, for that
+# hostcall device (cmake/lwip-forkpoint.cmake).
 
 set(LWIP_RUST_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE INTERNAL "")
 
@@ -79,6 +81,11 @@ function(lwip_rust_apply target)
         endif()
         list(APPEND features ${module})
     endforeach()
+    set(forkpoint_env "")
+    if(LWIP_FORKPOINT_HOSTCALL_BASE)
+        list(APPEND features forkpoint)
+        set(forkpoint_env "FPT_HOSTCALL_BASE=${LWIP_FORKPOINT_HOSTCALL_BASE}")
+    endif()
     set_property(TARGET ${target} PROPERTY SOURCES ${sources})
     string(JOIN "," features ${features})
 
@@ -116,13 +123,13 @@ function(lwip_rust_apply target)
     set(archive "${out}/target/${LWIP_RUST_TARGET}/release/liblwip.a")
     file(GLOB_RECURSE crate_sources CONFIGURE_DEPENDS
         "${root}/lwip/src/*.rs" "${root}/third_party/fp/src/*.rs"
-        "${root}/third_party/rivet/src/*.rs")
+        "${root}/third_party/rivet/src/*.rs" "${root}/third_party/forkpoint-sdk/src/*.rs")
     add_custom_command(
         OUTPUT "${object}"
         COMMAND ${CMAKE_COMMAND} -E env
             "LWIP_RUST_CONFIG=${config}"
             "CARGO_TARGET_DIR=${out}/target"
-            "RUSTFLAGS=--remap-path-prefix=${root}=/lwip-rust"
+            "RUSTFLAGS=--remap-path-prefix=${root}=/lwip-rust" ${forkpoint_env}
             "${LWIP_RUST_CARGO}" rustc --quiet --locked
             --manifest-path "${root}/lwip/Cargo.toml" --release
             --target ${LWIP_RUST_TARGET} --crate-type staticlib --features "${features}"
@@ -132,6 +139,7 @@ function(lwip_rust_apply target)
             -P "${root}/cmake/lwip-rust-localize.cmake"
         DEPENDS "${config}" ${crate_sources}
             "${root}/Cargo.toml" "${root}/Cargo.lock" "${root}/lwip/Cargo.toml"
+            "${root}/third_party/forkpoint-sdk/Cargo.toml"
             "${root}/lwip/build.rs" "${root}/cmake/lwip-rust-localize.cmake"
         COMMENT "Building lwIP Rust modules: ${features}"
         VERBATIM)

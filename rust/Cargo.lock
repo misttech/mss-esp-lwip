@@ -11,8 +11,13 @@ name = "lwip"
 version = "0.1.0"
 dependencies = [
  "fp",
+ "lwip-forkpoint-sdk",
  "rivet-libc",
 ]
+
+[[package]]
+name = "lwip-forkpoint-sdk"
+version = "0.1.0"
 
 [[package]]
 name = "rivet-libc"

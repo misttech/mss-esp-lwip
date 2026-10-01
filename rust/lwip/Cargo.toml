@@ -17,9 +17,22 @@ path = "src/lib.rs"
 fp = { path = "../third_party/fp" }
 rivet-libc = { path = "../third_party/rivet" }
 
+# The Forkpoint SDK, with the forkpoint feature. Firmware probes the hostcall device at
+# FPT_HOSTCALL_BASE; a host build only writes the catalog, so its tests run the macros.
+[target.'cfg(target_os = "none")'.dependencies]
+forkpoint = { package = "lwip-forkpoint-sdk", path = "../third_party/forkpoint-sdk", features = ["enabled"], optional = true }
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
+forkpoint = { package = "lwip-forkpoint-sdk", path = "../third_party/forkpoint-sdk", features = ["catalog"], optional = true }
+
+# Report every LWIP_ASSERT to Forkpoint as a property, as the C files do when built with
+# LWIP_FORKPOINT (see README.md). The firmware build turns it on with
+# LWIP_FORKPOINT_HOSTCALL_BASE.
+[features]
+forkpoint = ["dep:forkpoint"]
+
 # One feature per ported C file, named after it. The firmware build turns on the ones in
 # LWIP_RUST_MODULES and drops those C files.
-[features]
 def = []
 inet_chksum = []
 ip4_addr = []

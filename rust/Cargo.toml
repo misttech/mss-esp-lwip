@@ -3,6 +3,9 @@
 # lwIP in Rust. See README.md.
 [workspace]
 members = ["lwip", "third_party/fp", "third_party/rivet"]
+# Forkpoint's SDK, vendored as is: its own features are Forkpoint's to test, and
+# --all-features here would turn on probes for the host.
+exclude = ["third_party/forkpoint-sdk"]
 resolver = "3"
 
 [workspace.package]

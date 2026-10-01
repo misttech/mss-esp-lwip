@@ -1,0 +1,18 @@
+# Copyright 2026 Mist Tecnologia LTDA. All rights reserved.
+
+[package]
+name = "lwip-forkpoint-sdk"
+description = "Firmware SDK for reporting probes to the Forkpoint host"
+edition = "2024"
+version = "0.1.0"
+publish = false
+
+[features]
+# Compile probe stores in. Firmware also sets FPT_HOSTCALL_BASE to the
+# hostcall device's address. Without this feature every call compiles out.
+enabled = ["catalog"]
+# Record every assertion call site in the .fpt_catalog section, without
+# probing. enabled implies it; a host build uses it alone to test the catalog.
+catalog = []
+
+[dependencies]
