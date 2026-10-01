@@ -116,6 +116,9 @@ const SIZEOF_DNS_HDR: u16 = 12;
 const SIZEOF_DNS_QUERY: u16 = 4;
 /// `SIZEOF_DNS_ANSWER`: DNS answer message structure, as it is on the wire.
 const SIZEOF_DNS_ANSWER: u16 = 10;
+/// `SIZEOF_DNS_ANSWER_ASSERT`: the most `struct dns_answer` may take in C, padding
+/// included.
+const SIZEOF_DNS_ANSWER_ASSERT: u16 = 12;
 
 /// DNS table entry states.
 const DNS_STATE_UNUSED: u8 = 0;
@@ -264,9 +267,16 @@ fn server_is_any(idx: usize) -> bool {
 /// DNS_SERVER_ADDRESS is set).
 ///
 /// With random source ports, the PCBs are allocated per query, and ESP-IDF sets no
-/// fallback server here: there is nothing to do.
+/// fallback server here: there is nothing to do but dns.c's sanity checks. Its records
+/// are byte arrays of these sizes, so they hold by construction.
 #[cfg_attr(lwip_export, unsafe(no_mangle))]
-pub extern "C" fn dns_init() {}
+pub extern "C" fn dns_init() {
+    lwip_assert!("sanity check SIZEOF_DNS_QUERY", SIZEOF_DNS_QUERY == 4);
+    lwip_assert!(
+        "sanity check SIZEOF_DNS_ANSWER",
+        SIZEOF_DNS_ANSWER <= SIZEOF_DNS_ANSWER_ASSERT
+    );
+}
 
 /// Initialize one of the DNS servers.
 ///

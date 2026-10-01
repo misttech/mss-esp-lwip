@@ -742,7 +742,7 @@ pub unsafe extern "C" fn tcp_split_unsent_seg(pcb: *mut TcpPcb, split: u16) -> E
         // Create new pbuf for the remainder of the split.
         let p = pbuf_alloc(PBUF_TRANSPORT, remainder + optlen, PBUF_RAM);
         if p.is_null() {
-            return ERR_MEM;
+            return split_memerr(ptr::null_mut(), ptr::null_mut());
         }
 
         // Offset into the original pbuf is past TCP/IP headers, options, and split
@@ -756,8 +756,7 @@ pub unsafe extern "C" fn tcp_split_unsent_seg(pcb: *mut TcpPcb, split: u16) -> E
             offset,
         ) != remainder
         {
-            pbuf_free(p);
-            return ERR_MEM;
+            return split_memerr(ptr::null_mut(), p);
         }
 
         // Options are created when calling tcp_output().
@@ -785,7 +784,7 @@ pub unsafe extern "C" fn tcp_split_unsent_seg(pcb: *mut TcpPcb, split: u16) -> E
         );
         if seg.is_null() {
             // The pbuf was freed by tcp_create_segment.
-            return ERR_MEM;
+            return split_memerr(seg, ptr::null_mut());
         }
 
         // Remove this segment from the queue since trimming it may free pbufs.
@@ -816,6 +815,21 @@ pub unsafe extern "C" fn tcp_split_unsent_seg(pcb: *mut TcpPcb, split: u16) -> E
         }
     }
     ERR_OK
+}
+
+/// `tcp_split_unsent_seg`'s `memerr` label: frees the remainder pbuf `p`, if any, and
+/// fails. No segment was created.
+///
+/// # Safety
+///
+/// `p` is null or a pbuf the caller owns.
+unsafe fn split_memerr(seg: *mut TcpSeg, p: *mut Pbuf) -> ErrT {
+    lwip_assert!("seg == NULL", seg.is_null());
+    if !p.is_null() {
+        // SAFETY: as the caller guarantees.
+        unsafe { pbuf_free(p) };
+    }
+    ERR_MEM
 }
 
 /// Called by `tcp_close()` to send a segment including FIN flag but not data. This

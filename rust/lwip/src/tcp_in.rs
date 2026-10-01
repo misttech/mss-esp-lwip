@@ -132,6 +132,12 @@ fn recv_flags_set(f: u8) {
     RECV_FLAGS.set(RECV_FLAGS.get() | f);
 }
 
+/// `tcp_pcbs_sane()`, which `tcp_priv.h` defines as 1 without `TCP_DEBUG`,
+/// `TCP_INPUT_DEBUG`, or `TCP_OUTPUT_DEBUG`; `build.rs` requires all three off.
+const fn tcp_pcbs_sane() -> bool {
+    true
+}
+
 /// `TCP_SEQ_LT(a, b)` and the comparisons built on it.
 fn tcp_seq_lt(a: u32, b: u32) -> bool {
     (a.wrapping_sub(b) as i32) < 0
@@ -721,6 +727,8 @@ unsafe fn tcp_input_packet(p: *mut Pbuf, _inp: *mut Netif) -> bool {
             pbuf_free(p);
         }
     }
+
+    lwip_assert!("tcp_input: tcp_pcbs_sane()", tcp_pcbs_sane());
     true
 }
 

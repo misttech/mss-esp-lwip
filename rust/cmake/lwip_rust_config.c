@@ -263,6 +263,8 @@ void lwip_rust_config(void)
   ENTRY(LWIP_TESTMODE, LWIP_TESTMODE);
   ENTRY(LWIP_CHECKSUM_ON_COPY, LWIP_CHECKSUM_ON_COPY);
   ENTRY(PBUF_SPLIT_64K, LWIP_TCP && TCP_QUEUE_OOSEQ && LWIP_WND_SCALE);
+  /* tcp_priv.h defines tcp_pcbs_sane() as 1 unless one of these is on. */
+  ENTRY(TCP_DEBUG_ANY, TCP_DEBUG || TCP_INPUT_DEBUG || TCP_OUTPUT_DEBUG);
 #ifdef LWIP_DEBUG
   ENTRY(LWIP_DEBUG, 1);
 #else

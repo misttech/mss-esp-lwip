@@ -175,6 +175,7 @@ const VALUES: &[(&str, u64)] = &[
     ("LWIP_MEM_CLIB_HEAP_CAPS", 0),
     ("NO_SYS", 0),
     ("LWIP_DEBUG", 0),
+    ("TCP_DEBUG_ANY", 0),
     ("LWIP_CHECKSUM_ON_COPY", 0),
     ("MEMP_NUM_TCP_PCB", 16),
     ("PBUF_POOL_BUFSIZE", 1516),
@@ -625,6 +626,8 @@ fn main() {
         ("LWIP_NETIF_TX_SINGLE_PBUF", 1),
         ("TCP_HOOKS", 0),
         ("ESP_LWIP", 1),
+        // tcp_pcbs_sane() is 1 (tcp.rs).
+        ("TCP_DEBUG_ANY", 0),
     ];
     requires("tcp_out", &tcp_common);
     requires("tcp", &tcp_common);
