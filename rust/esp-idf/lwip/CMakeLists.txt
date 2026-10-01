@@ -19,6 +19,26 @@ include("${IDF_PATH}/components/lwip/CMakeLists.txt")
 
 # During ESP-IDF's early expansion, component files only declare requirements.
 if(NOT CMAKE_BUILD_EARLY_EXPANSION AND CONFIG_LWIP_ENABLE)
+    # ESP-IDF's file names lwIP's headers in its own lwip tree, while the sources resolve
+    # here. Compile this tree's sources, and every component that includes lwIP, against
+    # this tree's headers.
+    file(REAL_PATH "${IDF_PATH}/components/lwip/lwip/src/include" idf_headers)
+    foreach(property INCLUDE_DIRECTORIES INTERFACE_INCLUDE_DIRECTORIES)
+        get_target_property(dirs ${COMPONENT_LIB} ${property})
+        set(replaced "")
+        foreach(dir ${dirs})
+            file(REAL_PATH "${dir}" real)
+            if(real STREQUAL idf_headers)
+                set(dir "${CMAKE_CURRENT_LIST_DIR}/lwip/src/include")
+            endif()
+            list(APPEND replaced "${dir}")
+        endforeach()
+        if(dirs STREQUAL replaced)
+            message(FATAL_ERROR "${property} of ${COMPONENT_LIB} does not name ${idf_headers}")
+        endif()
+        set_property(TARGET ${COMPONENT_LIB} PROPERTY ${property} ${replaced})
+    endforeach()
+
     include("${CMAKE_CURRENT_LIST_DIR}/lwip/rust/cmake/lwip-rust.cmake")
     lwip_rust_apply(${COMPONENT_LIB} ${LWIP_RUST_MODULES})
 endif()
