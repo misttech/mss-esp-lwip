@@ -30,6 +30,10 @@ forkpoint = { package = "lwip-forkpoint-sdk", path = "../third_party/forkpoint-s
 # LWIP_FORKPOINT_HOSTCALL_BASE.
 [features]
 forkpoint = ["dep:forkpoint"]
+# Also mark edge paths, each a property some run must take: LWIP_SOMETIMES in C with
+# LWIP_FORKPOINT_COVERAGE, lwip_sometimes! here. The firmware build turns it on with
+# LWIP_FORKPOINT_COVERAGE.
+forkpoint-coverage = ["forkpoint"]
 
 # One feature per ported C file, named after it. The firmware build turns on the ones in
 # LWIP_RUST_MODULES and drops those C files.

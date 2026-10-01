@@ -211,6 +211,7 @@ pub extern "C" fn pbuf_alloc(layer: PbufLayer, length: u16, type_: PbufType) -> 
                 // SAFETY: a pool element, or null.
                 let q = unsafe { memp_malloc(config::MEMP_PBUF_POOL) }.cast::<Pbuf>();
                 if q.is_null() {
+                    lwip_sometimes!("pbuf_alloc: pbuf pool exhausted", true);
                     pbuf_pool_is_empty();
                     // Free chain so far allocated.
                     if !p.is_null() {
@@ -246,6 +247,7 @@ pub extern "C" fn pbuf_alloc(layer: PbufLayer, length: u16, type_: PbufType) -> 
                     p = q;
                 } else {
                     // Make previous pbuf point to this pbuf.
+                    lwip_sometimes!("pbuf_alloc: pool pbufs chained for a long packet", true);
                     // SAFETY: `last` is the chain's last pbuf.
                     unsafe { (*last).next = ptr::NonNull::new(q) };
                 }
@@ -716,6 +718,7 @@ pub unsafe extern "C" fn pbuf_free(p: *mut Pbuf) -> u8 {
                 // p->ref > 0, this pbuf is still referenced to (and so the remaining pbufs
                 // in chain as well). Stop walking through the chain.
                 p = ptr::null_mut();
+                lwip_sometimes!("pbuf_free: pbuf still referenced, kept", true);
             }
         }
     }

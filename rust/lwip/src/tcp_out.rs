@@ -490,6 +490,10 @@ pub unsafe extern "C" fn tcp_write(
             oversize = (*pcb).unsent_oversize;
             if oversize > 0 {
                 lwip_assert!("inconsistent oversize vs. space", oversize <= space);
+                lwip_sometimes!(
+                    "tcp_write: data fills the spare room of the last unsent segment",
+                    true
+                );
                 seg = last_unsent;
                 oversize_used = space.min(oversize.min(len));
                 pos += oversize_used;
@@ -803,6 +807,7 @@ pub unsafe extern "C" fn tcp_split_unsent_seg(pcb: *mut TcpPcb, split: u16) -> E
         // TCP_SND_QUEUELEN, but that is not an issue as the TCP layer will send out
         // these segments shortly.
         (*pcb).snd_queuelen = (*pcb).snd_queuelen.wrapping_add(pbuf_clen((*seg).p));
+        lwip_sometimes!("tcp_split_unsent_seg: segment split", true);
 
         // Finally insert remainder into queue after split (which stays head).
         (*seg).next = (*useg).next;
@@ -1023,6 +1028,10 @@ pub unsafe extern "C" fn tcp_output(pcb: *mut TcpPcb) -> ErrT {
                     && (*pcb).unacked.is_null()
                     && (*pcb).persist_backoff == 0
                 {
+                    lwip_sometimes!(
+                        "tcp_output: persist timer started for a closed window",
+                        true
+                    );
                     (*pcb).persist_cnt = 0;
                     (*pcb).persist_backoff = 1;
                     (*pcb).persist_probe = 0;
@@ -1252,6 +1261,10 @@ pub unsafe extern "C" fn tcp_rexmit_rto_prepare(pcb: *mut TcpPcb) -> ErrT {
             return ERR_VAL;
         }
 
+        lwip_sometimes!(
+            "tcp_rexmit_rto_prepare: retransmission timeout with unacked data",
+            true
+        );
         // Move all unacked segments to the head of the unsent queue. However, give up if
         // any of the unsent pbufs are still referenced by the netif driver due to
         // deferred transmission. No point loading the link further if it is struggling to
@@ -1385,6 +1398,7 @@ pub unsafe extern "C" fn tcp_rexmit_fast(pcb: *mut TcpPcb) {
     // SAFETY: as the caller guarantees.
     unsafe {
         if !(*pcb).unacked.is_null() && (*pcb).flags & TF_INFR == 0 {
+            lwip_sometimes!("tcp_rexmit_fast: fast retransmit", true);
             // This is fast retransmit. Retransmit the first unacked segment.
             if tcp_rexmit(pcb) == ERR_OK {
                 // Set ssthresh to half of the minimum of the current cwnd and the
@@ -1716,6 +1730,7 @@ pub unsafe extern "C" fn tcp_keepalive(pcb: *mut TcpPcb) -> ErrT {
     let optlen = u16::from(lwip_tcp_opt_length(0));
 
     lwip_assert!("tcp_keepalive: invalid pcb", !pcb.is_null());
+    lwip_sometimes!("tcp_keepalive: keepalive probe sent", true);
 
     // SAFETY: as the caller guarantees.
     unsafe {
@@ -1741,6 +1756,7 @@ pub unsafe extern "C" fn tcp_zero_window_probe(pcb: *mut TcpPcb) -> ErrT {
     let optlen = u16::from(lwip_tcp_opt_length(0));
 
     lwip_assert!("tcp_zero_window_probe: invalid pcb", !pcb.is_null());
+    lwip_sometimes!("tcp_zero_window_probe: zero window probe sent", true);
 
     // SAFETY: as the caller guarantees; the unsent head segment is live.
     unsafe {

@@ -10,7 +10,10 @@
 # LWIP_FORKPOINT, so each LWIP_ASSERT is also a Forkpoint property (src/include/lwip/
 # debug.h), and lwip_rust_apply builds the Rust modules with their forkpoint feature, which
 # does the same for lwip_assert!. Both report through the Forkpoint SDK in
-# third_party/forkpoint-sdk. Without the variable this does nothing.
+# third_party/forkpoint-sdk. With LWIP_FORKPOINT_COVERAGE on as well, the edge paths C marks
+# with LWIP_SOMETIMES and Rust with lwip_sometimes! are properties too, each one some run
+# must take (the C define LWIP_FORKPOINT_COVERAGE, the crate's forkpoint-coverage feature).
+# Without LWIP_FORKPOINT_HOSTCALL_BASE this does nothing.
 #
 # The SDK also records every assertion in the image's .fpt_catalog section. The image's
 # link must keep that section out of target memory; cmake/lwip-forkpoint-catalog.ld does,
@@ -26,4 +29,7 @@ function(lwip_forkpoint_apply target)
         LWIP_FORKPOINT FPT_ENABLE "FPT_HOSTCALL_BASE=${LWIP_FORKPOINT_HOSTCALL_BASE}")
     target_include_directories(${target} PRIVATE
         "${LWIP_FORKPOINT_ROOT}/third_party/forkpoint-sdk/include")
+    if(LWIP_FORKPOINT_COVERAGE)
+        target_compile_definitions(${target} PRIVATE LWIP_FORKPOINT_COVERAGE)
+    endif()
 endfunction()

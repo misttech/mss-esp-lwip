@@ -645,6 +645,7 @@ unsafe fn tcp_input_packet(p: *mut Pbuf, _inp: *mut Netif) -> bool {
                     // We don't really care enough to move this PCB to the front of the
                     // list since we are not very likely to receive that many segments
                     // for connections in TIME-WAIT.
+                    lwip_sometimes!("tcp_input: segment for a TIME-WAIT connection", true);
                     tcp_timewait_input(twpcb);
                     pbuf_free(p);
                     return true;
@@ -714,6 +715,7 @@ unsafe fn tcp_input_packet(p: *mut Pbuf, _inp: *mut Netif) -> bool {
         } else {
             // If no matching PCB was found, send a TCP RST (reset) to the sender.
             if tcph_flags(tcphdr) & TCP_RST == 0 {
+                lwip_sometimes!("tcp_input: RST sent for a segment with no connection", true);
                 tcp_rst_netif(
                     (*ipd).current_input_netif,
                     ackno(),
@@ -1086,6 +1088,7 @@ unsafe fn tcp_process(pcb: *mut TcpPcb) -> ErrT {
             }
 
             if acceptable {
+                lwip_sometimes!("tcp_process: connection reset by the peer", true);
                 lwip_assert!("tcp_input: pcb->state != CLOSED", (*pcb).state != CLOSED);
                 recv_flags_set(TF_RESET);
                 tcp_clear_flags(pcb, TF_ACK_DELAY);
@@ -1130,6 +1133,7 @@ unsafe fn tcp_process(pcb: *mut TcpPcb) -> ErrT {
                     (*pcb).snd_wnd_max = (*pcb).snd_wnd;
                     (*pcb).snd_wl1 = seqno().wrapping_sub(1); // Initialise to seqno - 1 to force window update.
                     (*pcb).state = ESTABLISHED;
+                    lwip_sometimes!("tcp_process: SYN-SENT connection established", true);
 
                     (*pcb).mss = tcp_eff_send_mss((*pcb).mss, &(*pcb).local_ip, &(*pcb).remote_ip);
 
@@ -1198,6 +1202,7 @@ unsafe fn tcp_process(pcb: *mut TcpPcb) -> ErrT {
                 } else if flags() & TCP_ACK != 0 {
                     // Expected ACK number?
                     if tcp_seq_between(ackno(), (*pcb).lastack.wrapping_add(1), (*pcb).snd_nxt) {
+                        lwip_sometimes!("tcp_process: SYN-RCVD connection established", true);
                         (*pcb).state = ESTABLISHED;
                         let err = if (*pcb).listener.is_null() {
                             // Listen pcb might be closed by now.
@@ -1684,6 +1689,7 @@ unsafe fn tcp_receive(pcb: *mut TcpPcb) {
                     tcp_receive_in_sequence(pcb);
                 } else {
                     // We get here if the incoming segment is out-of-sequence.
+                    lwip_sometimes!("tcp_receive: segment arrived out of sequence", true);
                     tcp_receive_out_of_sequence(pcb);
 
                     // We send the ACK packet after we've (potentially) dealt with SACKs, so
@@ -1823,11 +1829,13 @@ unsafe fn tcp_receive_in_sequence(pcb: *mut TcpPcb) {
         }
         if tcph_flags((*inseg).tcphdr) & TCP_FIN != 0 {
             recv_flags_set(TF_GOT_FIN);
+            lwip_sometimes!("tcp_receive: FIN received in sequence", true);
         }
 
         // We now check if we have segments on the ->ooseq queue that are now in
         // sequence.
         while !(*pcb).ooseq.is_null() && in_seqno((*pcb).ooseq) == (*pcb).rcv_nxt {
+            lwip_sometimes!("tcp_receive: queued segment now in sequence", true);
             let cseg = (*pcb).ooseq;
             SEQNO.set(in_seqno(cseg));
             // ESP-IDF: trim a segment the window cannot hold yet.

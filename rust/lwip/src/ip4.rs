@@ -338,12 +338,14 @@ pub unsafe extern "C" fn ip4_input(p: *mut Pbuf, inp: *mut Netif) -> ErrT {
         // Packet not for us?
         if netif.is_null() {
             // Packet not for us, route or discard.
+            lwip_sometimes!("ip4_input: packet for another host dropped", true);
             pbuf_free(p);
             return ERR_OK;
         }
         // Packet consists of multiple fragments?
         if hdr().offset & (IP_OFFMASK | IP_MF).to_be() != 0 {
             // IP_REASSEMBLY == 0: no packet fragment reassembly code present.
+            lwip_sometimes!("ip4_input: fragment dropped without reassembly", true);
             pbuf_free(p);
             return ERR_OK;
         }
@@ -371,6 +373,7 @@ pub unsafe extern "C" fn ip4_input(p: *mut Pbuf, inp: *mut Netif) -> ErrT {
                         let dest = (*ipd).current_iphdr_dest.ip4().addr;
                         if ip4_addr_isbroadcast_u32(dest, netif) == 0 && !ismulticast(dest) {
                             pbuf_header_force(p, iphdr_hlen as i16); // Move to ip header, no check necessary.
+                            lwip_sometimes!("ip4_input: protocol unreachable sent", true);
                             icmp_dest_unreach(p, ICMP_DUR_PROTO);
                         }
                     }
@@ -593,6 +596,7 @@ pub unsafe extern "C" fn ip4_output_if_opt_src(
         }
         // Don't fragment if interface has mtu set to 0 [loopif].
         if (*netif).mtu != 0 && (*p).tot_len > (*netif).mtu {
+            lwip_sometimes!("ip4_output_if: packet fragmented to fit the MTU", true);
             return ip4_frag(p, netif, dest);
         }
 

@@ -207,6 +207,7 @@ pub extern "C" fn etharp_tmr() {
                 || (e.state == ETHARP_STATE_PENDING && e.ctime >= ARP_MAXPENDING)
             {
                 // Pending or stable entry has become old!
+                lwip_sometimes!("etharp_tmr: entry expired", true);
                 // Clean up entries that have just been expired.
                 etharp_free_entry(i);
             } else if e.state == ETHARP_STATE_STABLE_REREQUESTING_1 {
@@ -360,6 +361,7 @@ unsafe fn etharp_find_entry(ipaddr: *const Ip4Addr, flags: u8, netif: *mut Netif
             return i16::from(ERR_MEM);
         }
 
+        lwip_sometimes!("etharp_find_entry: full table recycles an entry", true);
         // { empty or recyclable entry found }
         lwip_assert!("i < ARP_TABLE_SIZE", i < NONE);
         etharp_free_entry(i as usize);
@@ -446,6 +448,10 @@ unsafe fn etharp_update_arp_entry(
             let p = (*q).p;
             // Now queue entry can be freed.
             memp_free(config::MEMP_ARP_QUEUE, q.cast());
+            lwip_sometimes!(
+                "etharp_update_arp_entry: queued packet sent once resolved",
+                true
+            );
             // Send the queued IP packet.
             ethernet_output(
                 netif,
@@ -676,6 +682,7 @@ pub unsafe extern "C" fn etharp_input(p: *mut Pbuf, netif: *mut Netif) {
                 // packet that was queued on it.
                 // ARP request for our address?
                 if for_us && !from_us {
+                    lwip_sometimes!("etharp_input: ARP request for our address answered", true);
                     // Send ARP response.
                     let hwaddr = ptr::addr_of!((*netif).hwaddr).cast::<EthAddr>();
                     etharp_raw(
@@ -726,6 +733,10 @@ unsafe fn etharp_output_to_arp_index(netif: *mut Netif, q: *mut Pbuf, arp_idx: u
                 // Issue a standard request using broadcast.
                 if etharp_request(netif, ptr::addr_of!((*e).ipaddr)) == ERR_OK {
                     (*e).state = ETHARP_STATE_STABLE_REREQUESTING_1;
+                    lwip_sometimes!(
+                        "etharp_output: stable entry re-requested before it expires",
+                        true
+                    );
                 }
             } else if (*e).ctime >= ARP_AGE_REREQUEST_USED_UNICAST {
                 // Issue a unicast request (for 15 seconds) to prevent unnecessary
@@ -737,6 +748,10 @@ unsafe fn etharp_output_to_arp_index(netif: *mut Netif, q: *mut Pbuf, arp_idx: u
                 ) == ERR_OK
                 {
                     (*e).state = ETHARP_STATE_STABLE_REREQUESTING_1;
+                    lwip_sometimes!(
+                        "etharp_output: stable entry re-requested before it expires",
+                        true
+                    );
                 }
             }
         }
@@ -963,6 +978,7 @@ pub unsafe extern "C" fn etharp_query(
                 p = (*p).next.map_or(ptr::null_mut(), ptr::NonNull::as_ptr);
             }
             if copy_needed {
+                lwip_sometimes!("etharp_query: packet copied to queue it", true);
                 // Copy the whole packet into new pbufs.
                 p = pbuf_clone(config::PBUF_LINK_LAYER as PbufLayer, PBUF_RAM, q);
             } else {
@@ -994,11 +1010,16 @@ pub unsafe extern "C" fn etharp_query(
                         entry(idx).q = new_entry;
                     }
                     if qlen >= config::ARP_QUEUE_LEN as u32 {
+                        lwip_sometimes!("etharp_query: full queue drops the packet", true);
                         (*r).next = ptr::null_mut();
                         pbuf_free((*new_entry).p);
                         memp_free(config::MEMP_ARP_QUEUE, new_entry.cast());
                         return ERR_MEM;
                     }
+                    lwip_sometimes!(
+                        "etharp_query: packet queued until the address resolves",
+                        true
+                    );
                     result = ERR_OK;
                 } else {
                     // The pool MEMP_ARP_QUEUE is empty.

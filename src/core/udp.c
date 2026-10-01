@@ -416,6 +416,7 @@ udp_input(struct pbuf *p, struct netif *inp)
       if (!broadcast && !ip_addr_ismulticast(ip_current_dest_addr())) {
         /* move payload pointer back to ip header */
         pbuf_header_force(p, (s16_t)(ip_current_header_tot_len() + UDP_HLEN));
+        LWIP_SOMETIMES("udp_input: port unreachable sent", 1);
         icmp_port_unreach(ip_current_is_v6(), p);
       }
 #endif /* LWIP_ICMP || LWIP_ICMP6 */

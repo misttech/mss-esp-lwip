@@ -311,6 +311,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
            of the list since we are not very likely to receive that
            many segments for connections in TIME-WAIT. */
         LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: packed for TIME_WAITing connection.\n"));
+        LWIP_SOMETIMES("tcp_input: segment for a TIME-WAIT connection", 1);
 #ifdef LWIP_HOOK_TCP_INPACKET_PCB
         if (LWIP_HOOK_TCP_INPACKET_PCB(pcb, tcphdr, tcphdr_optlen, tcphdr_opt1len,
                                        tcphdr_opt2, p) == ERR_OK)
@@ -587,6 +588,7 @@ aborted:
        sender. */
     LWIP_DEBUGF(TCP_RST_DEBUG, ("tcp_input: no PCB match found, resetting.\n"));
     if (!(TCPH_FLAGS(tcphdr) & TCP_RST)) {
+      LWIP_SOMETIMES("tcp_input: RST sent for a segment with no connection", 1);
       TCP_STATS_INC(tcp.proterr);
       TCP_STATS_INC(tcp.drop);
       tcp_rst_netif(ip_data.current_input_netif, ackno, seqno + tcplen, ip_current_dest_addr(),
@@ -837,6 +839,7 @@ tcp_process(struct tcp_pcb *pcb)
 
     if (acceptable) {
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_process: Connection RESET\n"));
+      LWIP_SOMETIMES("tcp_process: connection reset by the peer", 1);
       LWIP_ASSERT("tcp_input: pcb->state != CLOSED", pcb->state != CLOSED);
       recv_flags |= TF_RESET;
       tcp_clear_flags(pcb, TF_ACK_DELAY);
@@ -888,6 +891,7 @@ tcp_process(struct tcp_pcb *pcb)
         pcb->snd_wnd_max = pcb->snd_wnd;
         pcb->snd_wl1 = seqno - 1; /* initialise to seqno - 1 to force window update */
         pcb->state = ESTABLISHED;
+        LWIP_SOMETIMES("tcp_process: SYN-SENT connection established", 1);
 
 #if TCP_CALCULATE_EFF_SEND_MSS
         pcb->mss = tcp_eff_send_mss(pcb->mss, &pcb->local_ip, &pcb->remote_ip);
@@ -954,6 +958,7 @@ tcp_process(struct tcp_pcb *pcb)
         if (TCP_SEQ_BETWEEN(ackno, pcb->lastack + 1, pcb->snd_nxt)) {
           pcb->state = ESTABLISHED;
           LWIP_DEBUGF(TCP_DEBUG, ("TCP connection established %"U16_F" -> %"U16_F".\n", inseg.tcphdr->src, inseg.tcphdr->dest));
+          LWIP_SOMETIMES("tcp_process: SYN-RCVD connection established", 1);
 #if LWIP_CALLBACK_API || TCP_LISTEN_BACKLOG
           if (pcb->listener == NULL) {
             /* listen pcb might be closed by now */
@@ -1588,6 +1593,7 @@ tcp_receive(struct tcp_pcb *pcb)
         }
         if (TCPH_FLAGS(inseg.tcphdr) & TCP_FIN) {
           LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_receive: received FIN.\n"));
+          LWIP_SOMETIMES("tcp_receive: FIN received in sequence", 1);
           recv_flags |= TF_GOT_FIN;
         }
 
@@ -1598,6 +1604,7 @@ tcp_receive(struct tcp_pcb *pcb)
                pcb->ooseq->tcphdr->seqno == pcb->rcv_nxt) {
 
           struct tcp_seg *cseg = pcb->ooseq;
+          LWIP_SOMETIMES("tcp_receive: queued segment now in sequence", 1);
           seqno = pcb->ooseq->tcphdr->seqno;
 #if ESP_LWIP
           if (pcb->rcv_wnd < TCP_TCPLEN(cseg)) {
@@ -1692,6 +1699,7 @@ tcp_receive(struct tcp_pcb *pcb)
 
       } else {
         /* We get here if the incoming segment is out-of-sequence. */
+        LWIP_SOMETIMES("tcp_receive: segment arrived out of sequence", 1);
 
 #if TCP_QUEUE_OOSEQ
         /* We queue the segment on the ->ooseq queue. */

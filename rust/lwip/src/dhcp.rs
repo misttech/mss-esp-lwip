@@ -352,6 +352,7 @@ unsafe fn dhcp_handle_nak(netif: *mut Netif) {
     // SAFETY: as the caller guarantees.
     unsafe {
         let dhcp = netif_dhcp_data(netif);
+        lwip_sometimes!("dhcp_handle_nak: NAK received", true);
         // Change to a defined state - set this before assigning the address to ensure
         // the callback can use dhcp_supplied_address().
         dhcp_set_state(dhcp, DHCP_STATE_BACKING_OFF);
@@ -541,6 +542,7 @@ pub extern "C" fn dhcp_coarse_tmr() {
                     (*dhcp).lease_used = (*dhcp).lease_used.wrapping_add(1);
                     (*dhcp).lease_used == (*dhcp).t0_timeout
                 } {
+                    lwip_sometimes!("dhcp_coarse_tmr: lease expired", true);
                     // This clients' lease time has expired.
                     dhcp_release_and_stop(netif);
                     dhcp_start(netif);
@@ -630,8 +632,10 @@ unsafe fn dhcp_timeout(netif: *mut Netif) {
         // Back-off period has passed, or server selection timed out.
         if state == DHCP_STATE_BACKING_OFF || state == DHCP_STATE_SELECTING {
             dhcp_discover(netif);
+            lwip_sometimes!("dhcp_timeout: discovery restarted", true);
         // Receiving the requested lease timed out.
         } else if state == DHCP_STATE_REQUESTING {
+            lwip_sometimes!("dhcp_timeout: request timed out", true);
             if (*dhcp).tries <= 5 {
                 dhcp_select(netif);
             } else {
@@ -667,6 +671,7 @@ unsafe fn dhcp_t1_timeout(netif: *mut Netif) {
         {
             // Just retry to renew - note that the rebind timer (t2) will eventually time-out
             // if renew tries fail.
+            lwip_sometimes!("dhcp_t1_timeout: lease renewing", true);
             dhcp_renew(netif);
             // Calculate next timeout.
             let next = (*dhcp).t2_timeout.wrapping_sub((*dhcp).lease_used) / 2;
@@ -693,6 +698,7 @@ unsafe fn dhcp_t2_timeout(netif: *mut Netif) {
             || state == DHCP_STATE_REBINDING
         {
             // Just retry to rebind.
+            lwip_sometimes!("dhcp_t2_timeout: lease rebinding", true);
             dhcp_rebind(netif);
             // Calculate next timeout.
             let next = (*dhcp).t0_timeout.wrapping_sub((*dhcp).lease_used) / 2;

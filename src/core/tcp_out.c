@@ -505,6 +505,7 @@ tcp_write(struct tcp_pcb *pcb, const void *arg, u16_t len, u8_t apiflags)
     oversize = pcb->unsent_oversize;
     if (oversize > 0) {
       LWIP_ASSERT("inconsistent oversize vs. space", oversize <= space);
+      LWIP_SOMETIMES("tcp_write: data fills the spare room of the last unsent segment", 1);
       seg = last_unsent;
       oversize_used = LWIP_MIN(space, LWIP_MIN(oversize, len));
       pos += oversize_used;
@@ -970,6 +971,7 @@ tcp_split_unsent_seg(struct tcp_pcb *pcb, u16_t split)
   pcb->snd_queuelen += pbuf_clen(seg->p);
 
   /* Finally insert remainder into queue after split (which stays head) */
+  LWIP_SOMETIMES("tcp_split_unsent_seg: segment split", 1);
   seg->next = useg->next;
   useg->next = seg;
 
@@ -1314,6 +1316,7 @@ tcp_output(struct tcp_pcb *pcb)
      * smaller than 1 SMSS implies in-flight data
      */
     if (wnd == pcb->snd_wnd && pcb->unacked == NULL && pcb->persist_backoff == 0) {
+      LWIP_SOMETIMES("tcp_output: persist timer started for a closed window", 1);
       pcb->persist_cnt = 0;
       pcb->persist_backoff = 1;
       pcb->persist_probe = 0;
@@ -1642,6 +1645,7 @@ tcp_rexmit_rto_prepare(struct tcp_pcb *pcb)
     return ERR_VAL;
   }
 
+  LWIP_SOMETIMES("tcp_rexmit_rto_prepare: retransmission timeout with unacked data", 1);
   /* Move all unacked segments to the head of the unsent queue.
      However, give up if any of the unsent pbufs are still referenced by the
      netif driver due to deferred transmission. No point loading the link further
@@ -1789,6 +1793,7 @@ tcp_rexmit_fast(struct tcp_pcb *pcb)
   LWIP_ASSERT("tcp_rexmit_fast: invalid pcb", pcb != NULL);
 
   if (pcb->unacked != NULL && !(pcb->flags & TF_INFR)) {
+    LWIP_SOMETIMES("tcp_rexmit_fast: fast retransmit", 1);
     /* This is fast retransmit. Retransmit the first unacked segment. */
     LWIP_DEBUGF(TCP_FR_DEBUG,
                 ("tcp_receive: dupacks %"U16_F" (%"U32_F
@@ -2149,6 +2154,7 @@ tcp_keepalive(struct tcp_pcb *pcb)
   u8_t optlen = LWIP_TCP_OPT_LENGTH_SEGMENT(0, pcb);
 
   LWIP_ASSERT("tcp_keepalive: invalid pcb", pcb != NULL);
+  LWIP_SOMETIMES("tcp_keepalive: keepalive probe sent", 1);
 
   LWIP_DEBUGF(TCP_DEBUG, ("tcp_keepalive: sending KEEPALIVE probe to "));
   ip_addr_debug_print_val(TCP_DEBUG, pcb->remote_ip);
@@ -2192,6 +2198,7 @@ tcp_zero_window_probe(struct tcp_pcb *pcb)
   u8_t optlen = LWIP_TCP_OPT_LENGTH_SEGMENT(0, pcb);
 
   LWIP_ASSERT("tcp_zero_window_probe: invalid pcb", pcb != NULL);
+  LWIP_SOMETIMES("tcp_zero_window_probe: zero window probe sent", 1);
 
   LWIP_DEBUGF(TCP_DEBUG, ("tcp_zero_window_probe: sending ZERO WINDOW probe to "));
   ip_addr_debug_print_val(TCP_DEBUG, pcb->remote_ip);

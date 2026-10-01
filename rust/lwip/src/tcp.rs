@@ -489,6 +489,10 @@ unsafe fn tcp_close_shutdown(pcb: *mut TcpPcb, rst_on_unacked_data: u8) -> ErrT 
         {
             // Not all data received by application, send RST to tell the remote side
             // about this.
+            lwip_sometimes!(
+                "tcp_close: RST sent for data the application never read",
+                true
+            );
             lwip_assert!("pcb->flags & TF_RXCLOSED", (*pcb).flags & TF_RXCLOSED != 0);
 
             // Don't call tcp_abort here: we must not deallocate the pcb since that might
@@ -1088,6 +1092,7 @@ pub unsafe extern "C" fn tcp_recved(pcb: *mut TcpPcb, len: u16) {
         // to be sent in the normal course of events (or more window to be available
         // later).
         if wnd_inflation >= TCP_WND_UPDATE_THRESHOLD {
+            lwip_sometimes!("tcp_recved: window update sent", true);
             tcp_ack_now(pcb);
             tcp_output(pcb);
         }
@@ -1307,6 +1312,10 @@ pub extern "C" fn tcp_slowtmr() {
                     || (*pcb).nrtx >= TCP_MAXRTX
                 {
                     // Max SYN retries, or max DATA retries, reached.
+                    lwip_sometimes!(
+                        "tcp_slowtmr: retransmissions exhausted, connection dropped",
+                        true
+                    );
                     pcb_remove += 1;
                 } else if (*pcb).persist_backoff > 0 {
                     lwip_assert!(
@@ -1355,6 +1364,7 @@ pub extern "C" fn tcp_slowtmr() {
                     }
 
                     if (*pcb).rtime >= (*pcb).rto {
+                        lwip_sometimes!("tcp_slowtmr: retransmission timer expired", true);
                         // Time for a retransmission. If prepare phase fails but we have
                         // unsent data but no unacked data, still execute the backoff
                         // calculations below, as this means we somehow failed to send
@@ -1410,6 +1420,7 @@ pub extern "C" fn tcp_slowtmr() {
                     let idle = tcp_ticks.get().wrapping_sub((*pcb).tmr);
                     let keep_dur = (*pcb).keep_cnt.wrapping_mul((*pcb).keep_intvl);
                     if idle > (*pcb).keep_idle.wrapping_add(keep_dur) / TCP_SLOW_INTERVAL {
+                        lwip_sometimes!("tcp_slowtmr: keepalive timeout, connection dropped", true);
                         pcb_remove += 1;
                         pcb_reset += 1;
                     } else if idle
@@ -1430,6 +1441,7 @@ pub extern "C" fn tcp_slowtmr() {
                     && tcp_ticks.get().wrapping_sub((*pcb).tmr)
                         >= ((*pcb).rto as u32).wrapping_mul(TCP_OOSEQ_TIMEOUT)
                 {
+                    lwip_sometimes!("tcp_slowtmr: idle out-of-sequence data dropped", true);
                     tcp_free_ooseq(pcb);
                 }
 
@@ -1531,6 +1543,7 @@ pub extern "C" fn tcp_slowtmr() {
             // Check if this PCB has stayed long enough in TIME-WAIT.
             if tcp_ticks.get().wrapping_sub((*pcb).tmr) > 2 * TCP_MSL / TCP_SLOW_INTERVAL {
                 // If the PCB should be removed, do it.
+                lwip_sometimes!("tcp_slowtmr: TIME-WAIT connection expired", true);
                 tcp_pcb_purge(pcb);
                 // Remove PCB from tcp_tw_pcbs list.
                 if !prev.is_null() {
