@@ -2233,6 +2233,14 @@ pub unsafe extern "C" fn tcp_pcb_remove(pcblist: *mut *mut TcpPcb, pcb: *mut Tcp
         // Reset the local port to prevent the pcb from being 'bound'.
         (*pcb).local_port = 0;
     }
+
+    lwip_assert!("tcp_pcb_remove: tcp_pcbs_sane()", tcp_pcbs_sane());
+}
+
+/// `tcp_pcbs_sane()`, which `tcp_priv.h` defines as 1 without `TCP_DEBUG`,
+/// `TCP_INPUT_DEBUG`, or `TCP_OUTPUT_DEBUG`; `build.rs` requires all three off.
+const fn tcp_pcbs_sane() -> bool {
+    true
 }
 
 /// Calculates a new initial sequence number for new connections: ESP-IDF's

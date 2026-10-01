@@ -225,11 +225,14 @@ pub unsafe fn aton(cp: *const c_char) -> Option<Ip4Addr> {
             val |= (parts[0] << 24) | (parts[1] << 16);
         }
         // a.b.c.d -- 8.8.8.8 bits
-        _ => {
+        4 => {
             if val > 0xff || parts[0] > 0xff || parts[1] > 0xff || parts[2] > 0xff {
                 return None;
             }
             val |= (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8);
+        }
+        _ => {
+            lwip_assert!("unhandled", false);
         }
     }
     Some(Ip4Addr { addr: val.to_be() })
