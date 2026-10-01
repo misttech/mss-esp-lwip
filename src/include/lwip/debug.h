@@ -128,6 +128,17 @@
 #define LWIP_ASSERT(message, assertion)
 #endif /* LWIP_NOASSERT */
 
+/* LWIP_SOMETIMES(message, condition): with LWIP_FORKPOINT and LWIP_FORKPOINT_COVERAGE, marks
+ * an edge path as a Forkpoint property that fails unless some run takes it with condition
+ * true. The Rust modules under rust/ mark the same paths with lwip_sometimes! and the same
+ * messages. Otherwise it compiles to nothing, condition included. */
+#if defined LWIP_FORKPOINT && defined LWIP_FORKPOINT_COVERAGE
+#include "forkpoint/hostcall.h"
+#define LWIP_SOMETIMES(message, condition) FPT_SOMETIMES(condition, message)
+#else
+#define LWIP_SOMETIMES(message, condition)
+#endif
+
 #ifndef LWIP_ERROR
 #ifdef LWIP_DEBUG
 #define LWIP_PLATFORM_ERROR(message) LWIP_PLATFORM_DIAG((message))

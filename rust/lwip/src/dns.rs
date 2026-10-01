@@ -398,6 +398,7 @@ unsafe fn dns_lookup(
                     }
                 }
                 if out_idx != 0 {
+                    lwip_sometimes!("dns_lookup: answered from the cache", true);
                     return ERR_OK;
                 }
             }
@@ -818,10 +819,15 @@ unsafe fn dns_check_entry(idx: u8) {
                         }
                         if dns_backupserver_available(e) && (*e).is_mdns == 0 {
                             // Change of server.
+                            lwip_sometimes!(
+                                "dns_check_entry: query switched to the backup server",
+                                true
+                            );
                             (*e).server_idx += 1;
                             (*e).tmr = 1;
                             (*e).retries = 0;
                         } else {
+                            lwip_sometimes!("dns_check_entry: query timed out", true);
                             // Call specified callback function if provided.
                             dns_call_found(idx, ptr::null_mut());
                             // Flush this entry.
@@ -830,6 +836,7 @@ unsafe fn dns_check_entry(idx: u8) {
                         }
                     } else {
                         // Wait longer for the next retry.
+                        lwip_sometimes!("dns_check_entry: query retransmitted", true);
                         (*e).tmr = (*e).retries;
                     }
 
@@ -851,6 +858,7 @@ unsafe fn dns_check_entry(idx: u8) {
                     }
                 }
                 if (*e).ipaddr_cnt == 0 {
+                    lwip_sometimes!("dns_check_entry: cached answer expired", true);
                     // Flush this entry, there cannot be any related pending entries in
                     // this state.
                     (*e).state = DNS_STATE_UNUSED;

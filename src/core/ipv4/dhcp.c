@@ -346,6 +346,7 @@ dhcp_handle_nak(struct netif *netif)
 {
   struct dhcp *dhcp = netif_dhcp_data(netif);
 
+  LWIP_SOMETIMES("dhcp_handle_nak: NAK received", 1);
   LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_handle_nak(netif=%p) %c%c%"U16_F"\n",
               (void *)netif, netif->name[0], netif->name[1], (u16_t)netif->num));
   /* Change to a defined state - set this before assigning the address
@@ -543,6 +544,7 @@ dhcp_coarse_tmr(void)
       /* compare lease time to expire timeout */
       if (dhcp->t0_timeout && (++dhcp->lease_used == dhcp->t0_timeout)) {
         LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, ("dhcp_coarse_tmr(): t0 timeout\n"));
+        LWIP_SOMETIMES("dhcp_coarse_tmr: lease expired", 1);
         /* this clients' lease time has expired */
         dhcp_release_and_stop(netif);
         dhcp_start(netif);
@@ -641,10 +643,12 @@ dhcp_timeout(struct netif *netif)
   /* back-off period has passed, or server selection timed out */
   if ((dhcp->state == DHCP_STATE_BACKING_OFF) || (dhcp->state == DHCP_STATE_SELECTING)) {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_timeout(): restarting discovery\n"));
+    LWIP_SOMETIMES("dhcp_timeout: discovery restarted", 1);
     dhcp_discover(netif);
     /* receiving the requested lease timed out */
   } else if (dhcp->state == DHCP_STATE_REQUESTING) {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, ("dhcp_timeout(): REQUESTING, DHCP request timed out\n"));
+    LWIP_SOMETIMES("dhcp_timeout: request timed out", 1);
     if (dhcp->tries <= 5) {
       dhcp_select(netif);
     } else {
@@ -685,6 +689,7 @@ dhcp_t1_timeout(struct netif *netif)
                 ("dhcp_t1_timeout(): must renew\n"));
     /* This slightly different to RFC2131: DHCPREQUEST will be sent from state
        DHCP_STATE_RENEWING, not DHCP_STATE_BOUND */
+    LWIP_SOMETIMES("dhcp_t1_timeout: lease renewing", 1);
     dhcp_renew(netif);
     /* Calculate next timeout */
     if (((dhcp->t2_timeout - dhcp->lease_used) / 2) >= DHCP_NEXT_TIMEOUT_THRESHOLD) {
@@ -711,6 +716,7 @@ dhcp_t2_timeout(struct netif *netif)
                 ("dhcp_t2_timeout(): must rebind\n"));
     /* This slightly different to RFC2131: DHCPREQUEST will be sent from state
        DHCP_STATE_REBINDING, not DHCP_STATE_BOUND */
+    LWIP_SOMETIMES("dhcp_t2_timeout: lease rebinding", 1);
     dhcp_rebind(netif);
     /* Calculate next timeout */
     if (((dhcp->t0_timeout - dhcp->lease_used) / 2) >= DHCP_NEXT_TIMEOUT_THRESHOLD) {

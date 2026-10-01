@@ -29,6 +29,17 @@ macro_rules! lwip_assert {
     };
 }
 
+/// `LWIP_SOMETIMES(message, condition)`: with the `forkpoint-coverage` feature, marks an
+/// edge path as a Forkpoint property that fails unless some run takes it with `condition`
+/// true, as `LWIP_SOMETIMES` does in C with `LWIP_FORKPOINT_COVERAGE`, on the same path and
+/// with the same message. Without the feature it compiles to nothing, condition included.
+macro_rules! lwip_sometimes {
+    ($message:literal, $condition:expr) => {
+        #[cfg(feature = "forkpoint-coverage")]
+        ::forkpoint::assert_sometimes!($condition, $message);
+    };
+}
+
 /// `LWIP_PLATFORM_ASSERT(message)` in ESP-IDF: the C library's `__assert_func`, or
 /// `abort()` when assertions are silent. Each string ends in a NUL. A host test panics
 /// instead, since the C library's failure path ends the process.

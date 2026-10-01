@@ -354,6 +354,7 @@ pub unsafe extern "C" fn udp_input(p: *mut Pbuf, inp: *mut Netif) {
             // No match was found, send ICMP destination port unreachable unless
             // destination address was broadcast/multicast.
             if !broadcast && !(*ipd).current_iphdr_dest.is_multicast() {
+                lwip_sometimes!("udp_input: port unreachable sent", true);
                 // Move payload pointer back to ip header.
                 pbuf_header_force(p, ((*ipd).current_ip_header_tot_len + UDP_HLEN) as i16);
                 if !(*ipd).current_ip6_header.is_null() {

@@ -16,7 +16,8 @@ Ports follow Forkpoint's C-to-Rust rubric. In short:
 4. **No new failure modes.** No allocation beyond lwIP's own pools, no panics on
    paths the C code could not fail on, no overflow the C code did not have.
    `LWIP_ASSERT` becomes `lwip_assert!`, which fails the way the port's
-   `LWIP_PLATFORM_ASSERT` does.
+   `LWIP_PLATFORM_ASSERT` does, and `LWIP_SOMETIMES` becomes `lwip_sometimes!`
+   on the same path, with the same message.
 5. **Safety at the edge.** Raw pointers stay in the `extern "C"` functions, which
    turn them into references and slices once. Every `unsafe` block has a
    `// SAFETY:` comment and every `unsafe fn` a `# Safety` section. Update

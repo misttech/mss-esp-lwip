@@ -22,7 +22,8 @@
 # LWIP_RUST_CARGO names cargo (found on PATH by default), LWIP_RUST_TARGET the Rust target
 # (riscv32imafc-unknown-none-elf by default: rv32imafc, ilp32f). With
 # LWIP_FORKPOINT_HOSTCALL_BASE set, the crate is built with its forkpoint feature, for that
-# hostcall device (cmake/lwip-forkpoint.cmake).
+# hostcall device, and with LWIP_FORKPOINT_COVERAGE also its forkpoint-coverage feature
+# (cmake/lwip-forkpoint.cmake).
 
 set(LWIP_RUST_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE INTERNAL "")
 
@@ -84,6 +85,9 @@ function(lwip_rust_apply target)
     set(forkpoint_env "")
     if(LWIP_FORKPOINT_HOSTCALL_BASE)
         list(APPEND features forkpoint)
+        if(LWIP_FORKPOINT_COVERAGE)
+            list(APPEND features forkpoint-coverage)
+        endif()
         set(forkpoint_env "FPT_HOSTCALL_BASE=${LWIP_FORKPOINT_HOSTCALL_BASE}")
     endif()
     set_property(TARGET ${target} PROPERTY SOURCES ${sources})

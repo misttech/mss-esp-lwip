@@ -691,6 +691,7 @@ ip4_input(struct pbuf *p, struct netif *inp)
   if (netif == NULL) {
     /* packet not for us, route or discard */
     LWIP_DEBUGF(IP_DEBUG | LWIP_DBG_TRACE, ("ip4_input: packet not for us.\n"));
+    LWIP_SOMETIMES("ip4_input: packet for another host dropped", 1);
 #if IP_FORWARD
     /* non-broadcast packet? */
     if (!ip4_addr_isbroadcast(ip4_current_dest_addr(), inp)) {
@@ -723,6 +724,7 @@ ip4_input(struct pbuf *p, struct netif *inp)
     iphdr = (const struct ip_hdr *)p->payload;
 #endif
 #else /* IP_REASSEMBLY == 0, no packet fragment reassembly code present */
+    LWIP_SOMETIMES("ip4_input: fragment dropped without reassembly", 1);
     pbuf_free(p);
     LWIP_DEBUGF(IP_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("IP packet dropped since it was fragmented (0x%"X16_F") (while IP_REASSEMBLY == 0).\n",
                 lwip_ntohs(IPH_OFFSET(iphdr))));
@@ -809,6 +811,7 @@ ip4_input(struct pbuf *p, struct netif *inp)
           if (!ip4_addr_isbroadcast(ip4_current_dest_addr(), netif) &&
               !ip4_addr_ismulticast(ip4_current_dest_addr())) {
             pbuf_header_force(p, (s16_t)iphdr_hlen); /* Move to ip header, no check necessary. */
+            LWIP_SOMETIMES("ip4_input: protocol unreachable sent", 1);
             icmp_dest_unreach(p, ICMP_DUR_PROTO);
           }
 #endif /* LWIP_ICMP */
@@ -1081,6 +1084,7 @@ ip4_output_if_opt_src(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *d
 #if IP_FRAG
   /* don't fragment if interface has mtu set to 0 [loopif] */
   if (netif->mtu && (p->tot_len > netif->mtu)) {
+    LWIP_SOMETIMES("ip4_output_if: packet fragmented to fit the MTU", 1);
     return ip4_frag(p, netif, dest);
   }
 #else

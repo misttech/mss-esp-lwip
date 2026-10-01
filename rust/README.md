@@ -104,6 +104,16 @@ run of the all-C build and a run with the Rust modules must reach the same
 properties, the same number of times. Since every `LWIP_ASSERT` becomes an
 `lwip_assert!`, the two images also carry the same messages.
 
+With `-DLWIP_FORKPOINT_COVERAGE=ON` as well, edge paths are properties too:
+each claims that some run takes it, such as a retransmission timeout, an
+out-of-sequence segment, a packet queued on an unresolved ARP entry, or a DHCP
+lease renewal. The C files mark them with `LWIP_SOMETIMES(message, condition)`
+(`LWIP_FORKPOINT_COVERAGE`), and the Rust modules with `lwip_sometimes!` (the
+`forkpoint-coverage` feature), on the same paths with the same messages, so the
+two also report the same coverage. A single run takes only some of these paths;
+the rest are for exploring many runs. Without the option the markers compile to
+nothing, their conditions included.
+
 The SDK also records each assertion in the image's `.fpt_catalog` section,
 which `cmake/lwip-forkpoint-catalog.ld` keeps in the ELF and out of target
 memory; `fpt catalog` lists it. The properties follow `LWIP_ASSERT`: a build

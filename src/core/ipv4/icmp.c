@@ -212,6 +212,7 @@ icmp_input(struct pbuf *p, struct netif *inp)
         struct ip_hdr *iphdr = (struct ip_hdr *)p->payload;
         ip4_addr_copy(iphdr->src, *src);
         ip4_addr_copy(iphdr->dest, *ip4_current_src_addr());
+        LWIP_SOMETIMES("icmp_input: echo request answered", 1);
         ICMPH_TYPE_SET(iecho, ICMP_ER);
 #if CHECKSUM_GEN_ICMP
         IF__NETIF_CHECKSUM_ENABLED(inp, NETIF_CHECKSUM_GEN_ICMP) {

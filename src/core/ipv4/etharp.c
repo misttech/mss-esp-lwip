@@ -215,6 +215,7 @@ etharp_tmr(void)
         /* pending or stable entry has become old! */
         LWIP_DEBUGF(ETHARP_DEBUG, ("etharp_timer: expired %s entry %d.\n",
                                    arp_table[i].state >= ETHARP_STATE_STABLE ? "stable" : "pending", i));
+        LWIP_SOMETIMES("etharp_tmr: entry expired", 1);
         /* clean up entries that have just been expired */
         etharp_free_entry(i);
       } else if (arp_table[i].state == ETHARP_STATE_STABLE_REREQUESTING_1) {
@@ -381,6 +382,7 @@ etharp_find_entry(const ip4_addr_t *ipaddr, u8_t flags, struct netif *netif)
     }
 
     /* { empty or recyclable entry found } */
+    LWIP_SOMETIMES("etharp_find_entry: full table recycles an entry", 1);
     LWIP_ASSERT("i < ARP_TABLE_SIZE", i < ARP_TABLE_SIZE);
     etharp_free_entry(i);
   }
@@ -483,6 +485,7 @@ etharp_update_arp_entry(struct netif *netif, const ip4_addr_t *ipaddr, struct et
     struct pbuf *p = arp_table[i].q;
     arp_table[i].q = NULL;
 #endif /* ARP_QUEUEING */
+    LWIP_SOMETIMES("etharp_update_arp_entry: queued packet sent once resolved", 1);
     /* send the queued IP packet */
     ethernet_output(netif, p, (struct eth_addr *)(netif->hwaddr), ethaddr, ETHTYPE_IP);
     /* free the queued IP packet */
@@ -713,6 +716,7 @@ etharp_input(struct pbuf *p, struct netif *netif)
       LWIP_DEBUGF (ETHARP_DEBUG | LWIP_DBG_TRACE, ("etharp_input: incoming ARP request\n"));
       /* ARP request for our address? */
       if (for_us && !from_us) {
+        LWIP_SOMETIMES("etharp_input: ARP request for our address answered", 1);
         /* send ARP response */
         etharp_raw(netif,
                    (struct eth_addr *)netif->hwaddr, &hdr->shwaddr,
@@ -758,11 +762,13 @@ etharp_output_to_arp_index(struct netif *netif, struct pbuf *q, netif_addr_idx_t
       /* issue a standard request using broadcast */
       if (etharp_request(netif, &arp_table[arp_idx].ipaddr) == ERR_OK) {
         arp_table[arp_idx].state = ETHARP_STATE_STABLE_REREQUESTING_1;
+        LWIP_SOMETIMES("etharp_output: stable entry re-requested before it expires", 1);
       }
     } else if (arp_table[arp_idx].ctime >= ARP_AGE_REREQUEST_USED_UNICAST) {
       /* issue a unicast request (for 15 seconds) to prevent unnecessary broadcast */
       if (etharp_request_dst(netif, &arp_table[arp_idx].ipaddr, &arp_table[arp_idx].ethaddr) == ERR_OK) {
         arp_table[arp_idx].state = ETHARP_STATE_STABLE_REREQUESTING_1;
+        LWIP_SOMETIMES("etharp_output: stable entry re-requested before it expires", 1);
       }
     }
   }
@@ -1023,6 +1029,7 @@ etharp_query(struct netif *netif, const ip4_addr_t *ipaddr, struct pbuf *q)
       p = p->next;
     }
     if (copy_needed) {
+      LWIP_SOMETIMES("etharp_query: packet copied to queue it", 1);
       /* copy the whole packet into new pbufs */
       p = pbuf_clone(PBUF_LINK, PBUF_RAM, q);
     } else {
@@ -1058,6 +1065,7 @@ etharp_query(struct netif *netif, const ip4_addr_t *ipaddr, struct pbuf *q)
 #if ARP_QUEUE_LEN
         if (qlen >= ARP_QUEUE_LEN) {
 #if ESP_LWIP_ARP 
+          LWIP_SOMETIMES("etharp_query: full queue drops the packet", 1);
           r->next = NULL;
           pbuf_free(new_entry->p);
           memp_free(MEMP_ARP_QUEUE, new_entry);
@@ -1072,6 +1080,7 @@ etharp_query(struct netif *netif, const ip4_addr_t *ipaddr, struct pbuf *q)
 #endif
         }
 #endif
+        LWIP_SOMETIMES("etharp_query: packet queued until the address resolves", 1);
         LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE, ("etharp_query: queued packet %p on ARP entry %"U16_F"\n", (void *)q, i));
         result = ERR_OK;
       } else {

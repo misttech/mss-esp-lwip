@@ -242,6 +242,7 @@ pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
         u16_t qlen;
         q = (struct pbuf *)memp_malloc(MEMP_PBUF_POOL);
         if (q == NULL) {
+          LWIP_SOMETIMES("pbuf_alloc: pbuf pool exhausted", 1);
           PBUF_POOL_IS_EMPTY();
           /* free chain so far allocated */
           if (p) {
@@ -262,6 +263,7 @@ pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
           p = q;
         } else {
           /* make previous pbuf point to this pbuf */
+          LWIP_SOMETIMES("pbuf_alloc: pool pbufs chained for a long packet", 1);
           last->next = q;
         }
         last = q;
@@ -792,6 +794,7 @@ pbuf_free(struct pbuf *p)
       /* (and so the remaining pbufs in chain as well) */
     } else {
       LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_free: %p has ref %"U16_F", ending here.\n", (void *)p, (u16_t)ref));
+      LWIP_SOMETIMES("pbuf_free: pbuf still referenced, kept", 1);
       /* stop walking through the chain */
       p = NULL;
     }

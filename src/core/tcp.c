@@ -353,6 +353,7 @@ tcp_close_shutdown(struct tcp_pcb *pcb, u8_t rst_on_unacked_data)
     if ((pcb->refused_data != NULL) || (pcb->rcv_wnd != TCP_WND_MAX(pcb))) {
       /* Not all data received by application, send RST to tell the remote
          side about this. */
+      LWIP_SOMETIMES("tcp_close: RST sent for data the application never read", 1);
       LWIP_ASSERT("pcb->flags & TF_RXCLOSED", pcb->flags & TF_RXCLOSED);
 
       /* don't call tcp_abort here: we must not deallocate the pcb since
@@ -1004,6 +1005,7 @@ tcp_recved(struct tcp_pcb *pcb, u16_t len)
    * Otherwise wait for a packet to be sent in the normal course of
    * events (or more window to be available later) */
   if (wnd_inflation >= TCP_WND_UPDATE_THRESHOLD) {
+    LWIP_SOMETIMES("tcp_recved: window update sent", 1);
     tcp_ack_now(pcb);
     tcp_output(pcb);
   }
@@ -1238,9 +1240,11 @@ tcp_slowtmr_start:
     if (pcb->state == SYN_SENT && pcb->nrtx >= TCP_SYNMAXRTX) {
       ++pcb_remove;
       LWIP_DEBUGF(TCP_DEBUG, ("tcp_slowtmr: max SYN retries reached\n"));
+      LWIP_SOMETIMES("tcp_slowtmr: retransmissions exhausted, connection dropped", 1);
     } else if (pcb->nrtx >= TCP_MAXRTX) {
       ++pcb_remove;
       LWIP_DEBUGF(TCP_DEBUG, ("tcp_slowtmr: max DATA retries reached\n"));
+      LWIP_SOMETIMES("tcp_slowtmr: retransmissions exhausted, connection dropped", 1);
     } else {
       if (pcb->persist_backoff > 0) {
         LWIP_ASSERT("tcp_slowtimr: persist ticking with in-flight data", pcb->unacked == NULL);
@@ -1284,6 +1288,7 @@ tcp_slowtmr_start:
 
         if (pcb->rtime >= pcb->rto) {
           /* Time for a retransmission. */
+          LWIP_SOMETIMES("tcp_slowtmr: retransmission timer expired", 1);
           LWIP_DEBUGF(TCP_RTO_DEBUG, ("tcp_slowtmr: rtime %"S16_F
                                       " pcb->rto %"S16_F"\n",
                                       pcb->rtime, pcb->rto));
@@ -1346,6 +1351,7 @@ tcp_slowtmr_start:
       if ((u32_t)(tcp_ticks - pcb->tmr) >
           (pcb->keep_idle + TCP_KEEP_DUR(pcb)) / TCP_SLOW_INTERVAL) {
         LWIP_DEBUGF(TCP_DEBUG, ("tcp_slowtmr: KEEPALIVE timeout. Aborting connection to "));
+        LWIP_SOMETIMES("tcp_slowtmr: keepalive timeout, connection dropped", 1);
         ip_addr_debug_print_val(TCP_DEBUG, pcb->remote_ip);
         LWIP_DEBUGF(TCP_DEBUG, ("\n"));
 
@@ -1368,6 +1374,7 @@ tcp_slowtmr_start:
     if (pcb->ooseq != NULL &&
         (tcp_ticks - pcb->tmr >= (u32_t)pcb->rto * TCP_OOSEQ_TIMEOUT)) {
       LWIP_DEBUGF(TCP_CWND_DEBUG, ("tcp_slowtmr: dropping OOSEQ queued data\n"));
+      LWIP_SOMETIMES("tcp_slowtmr: idle out-of-sequence data dropped", 1);
       tcp_free_ooseq(pcb);
     }
 #endif /* TCP_QUEUE_OOSEQ */
@@ -1457,6 +1464,7 @@ tcp_slowtmr_start:
 
     /* Check if this PCB has stayed long enough in TIME-WAIT */
     if ((u32_t)(tcp_ticks - pcb->tmr) > 2 * TCP_MSL / TCP_SLOW_INTERVAL) {
+      LWIP_SOMETIMES("tcp_slowtmr: TIME-WAIT connection expired", 1);
       ++pcb_remove;
     }
 

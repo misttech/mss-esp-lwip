@@ -729,6 +729,7 @@ dns_lookup(const char *name, size_t hostnamelen, ip_addr_t *addr LWIP_DNS_ADDRTY
             }
           }
           if (out_idx) {
+            LWIP_SOMETIMES("dns_lookup: answered from the cache", 1);
             return ERR_OK;
           }
       }
@@ -1194,11 +1195,13 @@ dns_check_entry(u8_t idx)
 #endif /* LWIP_DNS_SUPPORT_MDNS_QUERIES */
              ) {
             /* change of server */
+            LWIP_SOMETIMES("dns_check_entry: query switched to the backup server", 1);
             entry->server_idx++;
             entry->tmr = 1;
             entry->retries = 0;
           } else {
             LWIP_DEBUGF(DNS_DEBUG, ("dns_check_entry: \"%s\": timeout\n", entry->name));
+            LWIP_SOMETIMES("dns_check_entry: query timed out", 1);
             /* call specified callback function if provided */
             dns_call_found(idx, NULL);
             /* flush this entry */
@@ -1207,6 +1210,7 @@ dns_check_entry(u8_t idx)
           }
         } else {
           /* wait longer for the next retry */
+          LWIP_SOMETIMES("dns_check_entry: query retransmitted", 1);
           entry->tmr = entry->retries;
         }
 
@@ -1230,6 +1234,7 @@ dns_check_entry(u8_t idx)
 
       if (entry->ipaddr_cnt == 0) {
         LWIP_DEBUGF(DNS_DEBUG, ("dns_check_entry: \"%s\": flush\n", entry->name));
+        LWIP_SOMETIMES("dns_check_entry: cached answer expired", 1);
         /* flush this entry, there cannot be any related pending entries in this state */
         entry->state = DNS_STATE_UNUSED;
       }

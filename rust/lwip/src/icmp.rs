@@ -182,6 +182,7 @@ pub unsafe extern "C" fn icmp_input(p: *mut Pbuf, inp: *mut Netif) {
                     ptr::addr_of_mut!((*iphdr).src).write_unaligned(src.addr);
                     ptr::addr_of_mut!((*iphdr).dest)
                         .write_unaligned((*ipd).current_iphdr_src.ip4().addr);
+                    lwip_sometimes!("icmp_input: echo request answered", true);
                     ptr::addr_of_mut!((*iecho).type_).write(ICMP_ER);
                     // Adjust the checksum.
                     let chksum_ptr = ptr::addr_of_mut!((*iecho).chksum);
