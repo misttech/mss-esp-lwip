@@ -112,7 +112,16 @@
  * @}
  */
 
-#ifndef LWIP_NOASSERT
+#if !defined LWIP_NOASSERT && defined LWIP_FORKPOINT
+/* LWIP_FORKPOINT: each assertion is also a property of a Forkpoint run, reported through
+ * the Forkpoint SDK (FPT_ENABLE and FPT_HOSTCALL_BASE select the hostcall device), which
+ * fails if the assertion is ever false. The message names the property, as it does for
+ * the Rust modules under rust/, so a C file and its Rust module report the same ones. */
+#include "forkpoint/hostcall.h"
+#define LWIP_ASSERT(message, assertion) do { int lwip_assert_holds = (assertion) ? 1 : 0; \
+  FPT_ALWAYS_OR_UNREACHABLE(lwip_assert_holds, message); \
+  if (!lwip_assert_holds) { LWIP_PLATFORM_ASSERT(message); }} while(0)
+#elif !defined LWIP_NOASSERT
 #define LWIP_ASSERT(message, assertion) do { if (!(assertion)) { \
   LWIP_PLATFORM_ASSERT(message); }} while(0)
 #else  /* LWIP_NOASSERT */

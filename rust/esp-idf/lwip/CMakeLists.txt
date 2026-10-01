@@ -40,5 +40,13 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION AND CONFIG_LWIP_ENABLE)
     endforeach()
 
     include("${CMAKE_CURRENT_LIST_DIR}/lwip/rust/cmake/lwip-rust.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/lwip/rust/cmake/lwip-forkpoint.cmake")
     lwip_rust_apply(${COMPONENT_LIB} ${LWIP_RUST_MODULES})
+    # LWIP_FORKPOINT_HOSTCALL_BASE: lwIP's assertions, C and Rust, as Forkpoint properties,
+    # and the image keeps their catalog.
+    lwip_forkpoint_apply(${COMPONENT_LIB})
+    if(LWIP_FORKPOINT_HOSTCALL_BASE)
+        target_linker_script(${COMPONENT_LIB} INTERFACE
+            "${CMAKE_CURRENT_LIST_DIR}/lwip/rust/cmake/lwip-forkpoint-catalog.ld")
+    endif()
 endif()

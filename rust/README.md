@@ -10,8 +10,9 @@ Ethernet frame) is identical.
 | Directory | Contents |
 |---|---|
 | `lwip/` | The `lwip` crate: one module per ported C file, and the `#[repr(C)]` mirrors of the structs they share with C |
-| `cmake/` | `lwip_rust_apply()`, which swaps modules into a CMake lwIP target, and the configuration probe |
+| `cmake/` | `lwip_rust_apply()`, which swaps modules into a CMake lwIP target, the configuration probe, and `lwip_forkpoint_apply()`, which reports assertions to Forkpoint |
 | `esp-idf/lwip/` | ESP-IDF's `lwip` component, built from this tree with Rust modules |
+| `third_party/forkpoint-sdk/` | Forkpoint's firmware SDK, through which C and Rust report assertions as properties |
 | `third_party/fp/` | Zero-dependency `no_std` building blocks (`static_assert!`) |
 | `third_party/rivet/` | Rivet's C library, which the Rust modules take everything they need from a C library from |
 | `test/unit/` | lwIP's own unit tests, run against the Rust modules |
@@ -87,14 +88,39 @@ are the lwIP C symbols the modules define. The Rust runtime, compiler builtins,
 and C library inside it are local, so the C stack keeps binding to its own C
 library and libgcc.
 
+## Forkpoint properties
+
+Configure the project with `-DLWIP_FORKPOINT_HOSTCALL_BASE=<address>`, the
+address of the board's Forkpoint hostcall device (`0xa0000000` on the boards
+that carry one), and every lwIP assertion becomes a
+[Forkpoint](https://github.com/misttech/forkpoint) property as well: a claim
+that the assertion never fails, which Forkpoint judges after each run. The C
+files are compiled with `LWIP_FORKPOINT` (`src/include/lwip/debug.h`), and the
+Rust modules with their `forkpoint` feature (`lwip_assert!` in
+`lwip/src/platform.rs`). Both report through the Forkpoint SDK in
+`third_party/forkpoint-sdk`. A property is named by the assertion's message,
+so a C file and the Rust module that replaces it report the same properties: a
+run of the all-C build and a run with the Rust modules must reach the same
+properties, the same number of times. Since every `LWIP_ASSERT` becomes an
+`lwip_assert!`, the two images also carry the same messages.
+
+The SDK also records each assertion in the image's `.fpt_catalog` section,
+which `cmake/lwip-forkpoint-catalog.ld` keeps in the ELF and out of target
+memory; `fpt catalog` lists it. The properties follow `LWIP_ASSERT`: a build
+with `LWIP_NOASSERT` reports none. Without the option nothing changes.
+
 ## Host checks
 
 ```bash
 cargo fmt --all --check
 cargo clippy --all-features --all-targets -- -D warnings
 cargo test --all-features
-cargo build -p lwip --all-features --target riscv32imafc-unknown-none-elf --release
+FPT_HOSTCALL_BASE=0xa0000000 \
+  cargo build -p lwip --all-features --target riscv32imafc-unknown-none-elf --release
 ```
+
+`--all-features` includes `forkpoint`, whose firmware build needs the hostcall
+device's address. A host build only writes the catalog.
 
 ## lwIP's unit tests
 
