@@ -45,24 +45,20 @@ impl StatsMem {
     }
 }
 
-#[cfg(lwip_layout)]
+// Without LWIP_STATS there is no `struct stats_` to check the mirrors against.
+#[cfg(all(lwip_layout, lwip_stats))]
 mod layout {
     use core::mem::{offset_of, size_of};
 
     use super::*;
     use crate::config::*;
 
-    #[cfg(lwip_stats)]
     fp::static_assert!(size_of::<StatCounter>() == SIZEOF_STAT_COUNTER);
-    #[cfg(lwip_stats)]
     fp::static_assert!(size_of::<StatsMem>() == SIZEOF_STATS_MEM);
-    #[cfg(all(lwip_stats, lwip_stats_display))]
+    #[cfg(lwip_stats_display)]
     fp::static_assert!(offset_of!(StatsMem, name) == STATS_MEM_NAME);
-    #[cfg(lwip_stats)]
     fp::static_assert!(offset_of!(StatsMem, err) == STATS_MEM_ERR);
-    #[cfg(lwip_stats)]
     fp::static_assert!(offset_of!(StatsMem, used) == STATS_MEM_USED);
-    #[cfg(lwip_stats)]
     fp::static_assert!(offset_of!(StatsMem, max) == STATS_MEM_MAX);
 }
 
